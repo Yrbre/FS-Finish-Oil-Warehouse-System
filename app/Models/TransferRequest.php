@@ -1,0 +1,128 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class TransferRequest extends Model
+{
+    use HasFactory, SoftDeletes;
+
+    // Alur status: new → in_transit → received
+    // Cabang: new → rejected (oleh IMC) | new → cancelled (oleh requester)
+    const STATUS_NEW        = 'new';
+    const STATUS_IN_TRANSIT = 'in_transit';
+    const STATUS_RECEIVED   = 'received';
+    const STATUS_REJECTED   = 'rejected';
+    const STATUS_CANCELLED  = 'cancelled';
+
+    protected $fillable = [
+        'transfer_code',
+        'item_id',
+        'requested_qty',
+        'destination_warehouse_id',
+        'department_id',
+        'expected_date',
+        'notes',
+        'status',
+        'requested_by',
+        'approved_by',
+        'approved_at',
+        'approved_date',
+        'received_by',
+        'received_at',
+        'received_date',
+        'rejected_by',
+        'rejected_at',
+        'reject_reason',
+        'cancelled_by',
+        'cancelled_at',
+    ];
+
+    protected $casts = [
+        'requested_qty' => 'decimal:2',
+        'expected_date' => 'date',
+        'approved_date' => 'date',
+        'received_date' => 'date',
+        'approved_at'   => 'datetime',
+        'received_at'   => 'datetime',
+        'rejected_at'   => 'datetime',
+        'cancelled_at'  => 'datetime',
+    ];
+
+    public function item()
+    {
+        return $this->belongsTo(Item::class);
+    }
+
+    public function destinationWarehouse()
+    {
+        return $this->belongsTo(Warehouse::class, 'destination_warehouse_id');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function details()
+    {
+        return $this->hasMany(TransferRequestDetail::class);
+    }
+
+    public function requester()
+    {
+        return $this->belongsTo(User::class, 'requested_by');
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function receiver()
+    {
+        return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function rejecter()
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    public function canceller()
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    /**
+     * Request hanya bisa dibatalkan requester selama belum ada
+     * approval maupun penolakan.
+     */
+    public function isCancellable(): bool
+    {
+        return $this->status === self::STATUS_NEW;
+    }
+
+    /**
+     * Generate kode dengan format TRNS-yymmdd001, reset tiap hari.
+     */
+    public static function generateTransferCode(): string
+    {
+        $prefix = 'TRNS-';
+        $date   = now()->format('ymd');
+
+        $lastRecord = self::withTrashed()
+            ->where('transfer_code', 'like', $prefix . $date . '%')
+            ->orderBy('transfer_code', 'desc')
+            ->first();
+
+        $newNumber = $lastRecord
+            ? ((int) substr($lastRecord->transfer_code, strlen($prefix . $date))) + 1
+            : 1;
+
+        return $prefix . $date . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
+    }
+}
