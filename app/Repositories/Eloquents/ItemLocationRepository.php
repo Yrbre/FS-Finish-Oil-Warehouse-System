@@ -3,9 +3,10 @@
 namespace App\Repositories\Eloquents;
 
 use App\Models\ItemLocation;
-use App\Repositories\Interfaces\ItemLocationsRepositoryInterface;
+use App\Repositories\Interfaces\ItemLocationRepositoryInterface;
 
-class ItemLocationRepository implements ItemLocationsRepositoryInterface
+
+class ItemLocationRepository implements ItemLocationRepositoryInterface
 {
     protected ItemLocation $model;
     public function __construct(ItemLocation $model)

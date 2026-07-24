@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Repositories\Interfaces;
+
+interface TransferRequestRepositoryInterface
+{
+    public function getAll();
+    public function getById(int $id);
+    public function create(array $data);
+    public function update(int $id, array $data);
+    public function delete(int $id);
+
+    /**
+     * Simpan breakdown lot hasil FEFO (bulk insert).
+     */
+    public function createDetails(array $details): void;
+
+    /**
+     * Semua breakdown lot milik 1 transfer request.
+     */
+    public function getDetails(int $transferRequestId);
+
+    /**
+     * Apakah user ini terdaftar sebagai approver transfer (IMC)?
+     */
+    public function isApprover(int $userId): bool;
+}
