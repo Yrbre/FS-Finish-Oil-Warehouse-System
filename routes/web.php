@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,4 +31,24 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__.'/auth.php';
+Route::middleware('auth')->group(function () {
+
+    Route::middleware('can:manage-departments')->group(function () {
+        Route::resource('departments', DepartmentController::class)->except('show');
+    });
+
+    Route::middleware('can:manage-warehouses')->group(function () {
+        Route::resource('warehouses', WarehouseController::class)->except('show');
+    });
+
+    Route::middleware('can:manage-items')->group(function () {
+        // Route spesifik didaftarkan sebelum resource supaya tidak
+        // ketabrak pola items/{item}
+        Route::get('items/get-stock', [ItemController::class, 'getStock'])->name('items.get-stock');
+        Route::get('items/{id}/detail', [ItemController::class, 'detail'])->name('items.detail');
+
+        Route::resource('items', ItemController::class)->except('show');
+    });
+});
+
+require __DIR__ . '/auth.php';
