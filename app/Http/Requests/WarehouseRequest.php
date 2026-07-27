@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class WarehouseRequest extends FormRequest
 {
@@ -18,11 +17,10 @@ class WarehouseRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:255'],
-            'code' => [
+            'tag' => [
                 'required',
                 'string',
                 'max:50',
-                Rule::unique('warehouses', 'code')->ignore($warehouseId),
             ],
             'department_id' => ['required', 'exists:departments,id'],
         ];
@@ -32,7 +30,7 @@ class WarehouseRequest extends FormRequest
     {
         return [
             'name'          => 'nama gudang',
-            'code'          => 'kode gudang',
+            'tag'           => 'kode gudang',
             'department_id' => 'department',
         ];
     }
