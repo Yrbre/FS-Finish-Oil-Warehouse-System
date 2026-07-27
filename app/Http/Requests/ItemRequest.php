@@ -23,8 +23,9 @@ class ItemRequest extends FormRequest
                 'max:100',
                 Rule::unique('items', 'item_no')->ignore($itemId),
             ],
-            'item_desc' => ['required', 'string', 'max:255'],
-            'item_uom'  => ['required', 'string', 'max:20'],
+            'item_desc'     => ['required', 'string', 'max:255'],
+            'item_uom'      => ['required', 'string', 'max:20'],
+            'item_glclass'  => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -34,6 +35,7 @@ class ItemRequest extends FormRequest
             'item_no'   => 'kode item',
             'item_desc' => 'nama item',
             'item_uom'  => 'satuan',
+            'item_glclass' => 'GL CLASS',
         ];
     }
 }

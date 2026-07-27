@@ -15,7 +15,7 @@ class ItemRepository implements ItemRepositoryInterface
 
     public function getAll()
     {
-        return $this->model->quary();
+        return $this->model->query();
     }
 
     public function getById(int $id)
