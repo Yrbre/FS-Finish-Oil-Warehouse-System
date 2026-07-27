@@ -4,7 +4,10 @@ namespace Database\Seeders;
 
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
+use App\Models\Department;
+use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -13,13 +16,26 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // \App\Models\User::factory(10)->create();
-
-        // \App\Models\User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
 
         $this->call(RolesAndPermissionSeeder::class);
+
+        // Department awal — IMC sebagai pusat gudang (Gudang Finish Oil)
+        $imcDepartment = Department::firstOrCreate(
+            ['code' => 'IMC'],
+            ['name' => 'Inventory Material Control']
+        );
+
+        // Akun admin awal
+        $admin = User::firstOrCreate(
+            ['email' => 'admin@tifico.co.id'],
+            [
+                'name'          => 'admin',
+                'password'      => Hash::make('1'),
+                'department_id' => $imcDepartment->id,
+            ]
+        );
+
+        // Aturan bisnis: 1 user = 1 role
+        $admin->assignSingleRole('admin');
     }
 }
