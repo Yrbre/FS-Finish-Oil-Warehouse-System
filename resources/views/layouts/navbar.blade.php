@@ -77,7 +77,7 @@
                 @endcanany
 
                 {{-- Inventory --}}
-                {{-- @can('manage-item-locations')
+                @can('manage-item-locations')
                     <li class="nav-item dropdown">
                         <a href="#" id="inventoryDropdown" class="dropdown-toggle nav-link" role="button"
                             data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -88,7 +88,7 @@
                                     Onhand</span></a>
                         </div>
                     </li>
-                @endcan --}}
+                @endcan
 
                 {{-- Laporan --}}
                 {{-- @can('view-reports')
@@ -126,7 +126,8 @@
                             onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                             Logout
                         </a>
-                        <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                        <form id="logout-form" action="{{ route('logout') }}" method="POST"
+                            style="display: none;">
                             @csrf
                         </form>
                     </li>

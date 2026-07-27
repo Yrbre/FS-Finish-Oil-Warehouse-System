@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ItemController;
+use App\Http\Controllers\ItemLocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
@@ -57,9 +58,9 @@ Route::middleware('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-// Route::middleware(['auth', 'can:manage-item-locations'])->group(function () {
-//     Route::resource('item-locations', ItemLocationController::class)->except('show');
-// });
+Route::middleware(['auth', 'can:manage-item-locations'])->group(function () {
+    Route::resource('item-locations', ItemLocationController::class)->except('show');
+});
 
 // Route::middleware(['auth', 'can:create-transaction'])->group(function () {
 //     Route::get('transactions/get-lots', [TransactionController::class, 'getLots'])->name('transactions.get-lots');

@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-
 use App\Repositories\Interfaces\ItemLocationRepositoryInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 
 class ItemLocationService implements ItemLocationServiceInterface
 {
     protected ItemLocationRepositoryInterface $itemLocationRepository;
+
     public function __construct(ItemLocationRepositoryInterface $itemLocationRepository)
     {
         $this->itemLocationRepository = $itemLocationRepository;
@@ -26,12 +26,32 @@ class ItemLocationService implements ItemLocationServiceInterface
 
     public function create(array $data)
     {
+        $data = $this->applyExpiryRule($data);
+
         return $this->itemLocationRepository->create($data);
     }
 
     public function update(int $id, array $data)
     {
+        $data = $this->applyExpiryRule($data);
+
         return $this->itemLocationRepository->update($id, $data);
+    }
+
+    /**
+     * Business rule: tanggal expired selalu 1 tahun setelah tanggal produksi.
+     * Ditaruh di service (bukan Form Request) supaya berlaku konsisten
+     * dari pintu masuk manapun — form manual maupun transaksi PORC.
+     */
+    private function applyExpiryRule(array $data): array
+    {
+        if (! empty($data['production_date'])) {
+            $data['exp_date'] = \Carbon\Carbon::parse($data['production_date'])
+                ->addYear()
+                ->toDateString();
+        }
+
+        return $data;
     }
 
     public function delete(int $id)
@@ -64,30 +84,40 @@ class ItemLocationService implements ItemLocationServiceInterface
         return $allocation;
     }
 
-    public function allocateFefoAcrossWarehouses(int $itemId, float $qtyNeeded, ?int $excludeWarehouseId, float &$remaining): array
-    {
-        $lots = $this->itemLocationRepository->getFefoLotsAcrossWarehouses($itemId, $excludeWarehouseId);
+    public function allocateFefoAcrossWarehouses(
+        int $itemId,
+        float $qtyNeeded,
+        ?int $excludeWarehouseId,
+        float &$remainingQty
+    ): array {
+        $lots = $this->itemLocationRepository
+            ->getFefoLotsAcrossWarehouses($itemId, $excludeWarehouseId);
 
         $allocation = $this->buildAllocation($lots, $qtyNeeded, $remaining);
 
         // Sengaja tidak throw — pemanggil yang menentukan apa yang terjadi
         // kalau stok seluruh gudang tidak mencukupi.
         $remainingQty = $remaining;
+
         return $allocation;
     }
-
 
     public function deductLot(int $itemLocationId, float $qty)
     {
         $lot = $this->itemLocationRepository->getById($itemLocationId);
+
         $newQty = (float) $lot->qty_weight - $qty;
+
         if ($newQty < 0) {
             throw new \Exception(
                 "Pengurangan melebihi stok lot " . ($lot->vendor_lot ?? '-') . ". " .
                     "Stok tersedia: " . number_format((float) $lot->qty_weight, 2, ',', '.')
             );
         }
-        return $this->itemLocationRepository->update($itemLocationId, ['qty_weight' => $newQty]);
+
+        return $this->itemLocationRepository->update($itemLocationId, [
+            'qty_weight' => $newQty,
+        ]);
     }
 
     public function addOrMergeLot(int $itemId, int $warehouseId, array $lotData)
@@ -118,22 +148,26 @@ class ItemLocationService implements ItemLocationServiceInterface
      * Logika inti FEFO: ambil dari lot paling dekat expired,
      * kalau belum cukup lanjut ke lot berikutnya.
      */
-    private function buildAllocation(object $lots, float $qtyNeeded, ?float &$remaining): array
+    private function buildAllocation($lots, float $qtyNeeded, ?float &$remaining): array
     {
-        $remaining = $qtyNeeded;
+        $remaining  = $qtyNeeded;
         $allocation = [];
 
         foreach ($lots as $lot) {
             if ($remaining <= 0) {
                 break;
             }
+
             $take = min((float) $lot->qty_weight, $remaining);
+
             $allocation[] = [
                 'item_location' => $lot,
-                'qty_to_take' => $take,
+                'qty_to_take'   => $take,
             ];
+
             $remaining -= $take;
         }
+
         return $allocation;
     }
 }
