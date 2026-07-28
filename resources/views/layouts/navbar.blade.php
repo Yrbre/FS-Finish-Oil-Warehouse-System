@@ -60,12 +60,12 @@
                             Transaksi
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="transaksiDropdown">
-                            {{-- @can('create-transaction')
+                            @can('create-transaction')
                                 <li>
                                     <a class="nav-link pl-lg-2" href="{{ route('transactions.index') }}"><span
                                             class="ml-1">Supply Oil</span></a>
                                 </li>
-                            @endcan --}}
+                            @endcan
                             {{-- @canany(['manage-transfer-request', 'approve-transfer'])
                                 <li>
                                     <a class="nav-link pl-lg-2" href="{{ route('transfer-requests.index') }}"><span

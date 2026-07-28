@@ -2,32 +2,20 @@
 
 namespace App\Services\Interfaces;
 
-use Carbon\Carbon;
-
 interface StockLedgerServiceInterface
 {
     /**
-     * Catat 1 baris mutasi, lalu langsung recalculate saldo dari
-     * tanggal itu ke depan. Dipanggil setiap ada perubahan stok final.
+     * Catat 1 baris arsip riwayat. Murni append — tidak menghitung ulang
+     * apapun. bb_qty/eb_qty sudah final dan dikirim oleh pemanggil
+     * (TransactionService, TransferRequestService), yang menghitungnya
+     * langsung dari kondisi item_locations saat itu.
      */
     public function record(array $data);
 
     /**
-     * Hitung ulang bb_qty/eb_qty secara kronologis mulai tanggal tertentu,
-     * lalu sinkronkan hasilnya balik ke tabel transactions.
-     *
-     * Throw Exception kalau ada titik waktu yang saldonya jadi minus.
-     */
-    public function recalculateFrom(int $itemId, int $warehouseId, Carbon $fromDate): void;
-
-    /**
-     * Hapus jejak ledger dari 1 record asal, lalu recalculate ulang.
-     */
-    public function removeByRef(string $refType, int $refId, int $itemId, int $warehouseId, Carbon $fromDate): void;
-
-    /**
-     * Kartu stok 1 bulan penuh. Semua tanggal terisi, termasuk hari
-     * tanpa transaksi (saldonya dibawa dari hari sebelumnya).
+     * Kartu stok 1 bulan penuh, untuk laporan.
+     * Semua tanggal terisi, saldo hari kosong dibawa dari hari sebelumnya.
+     * Ini murni MEMBACA arsip — tidak pernah menulis ulang.
      */
     public function getMonthlyStockCard(int $itemId, int $month, int $year, ?int $warehouseId = null);
 }

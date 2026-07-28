@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Repositories\Eloquent;
+namespace App\Repositories\Eloquents;
 
 use App\Models\TransferApprover;
 use App\Models\TransferRequest;

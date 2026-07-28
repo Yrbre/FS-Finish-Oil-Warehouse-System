@@ -19,17 +19,20 @@ class TransactionService implements TransactionServiceInterface
     protected ItemRepositoryInterface $itemRepository;
     protected ItemLocationServiceInterface $itemLocationService;
     protected StockLedgerServiceInterface $stockLedgerService;
+    protected \App\Repositories\Interfaces\StockLedgerRepositoryInterface $stockLedgerRepository;
 
     public function __construct(
         TransactionRepositoryInterface $transactionRepository,
         ItemRepositoryInterface $itemRepository,
         ItemLocationServiceInterface $itemLocationService,
-        StockLedgerServiceInterface $stockLedgerService
+        StockLedgerServiceInterface $stockLedgerService,
+        \App\Repositories\Interfaces\StockLedgerRepositoryInterface $stockLedgerRepository
     ) {
         $this->transactionRepository = $transactionRepository;
         $this->itemRepository        = $itemRepository;
         $this->itemLocationService   = $itemLocationService;
         $this->stockLedgerService    = $stockLedgerService;
+        $this->stockLedgerRepository = $stockLedgerRepository;
     }
 
     public function getAll()
@@ -46,42 +49,53 @@ class TransactionService implements TransactionServiceInterface
     {
         return DB::transaction(function () use ($data, $createdBy) {
             $item      = $this->itemRepository->getById((int) $data['item_id']);
+            $itemId    = (int) $data['item_id'];
+            $warehouseId = (int) $data['warehouse_id'];
             $transDate = Carbon::parse($data['trans_date']);
             $transQty  = (float) $data['trans_qty'];
 
-            // Snapshot info item pada saat transaksi dibuat, supaya
-            // riwayat tetap terbaca walaupun master item diubah nanti
+            // bb_qty = kondisi stok SEKARANG di item_locations, bukan dari
+            // riwayat ledger. Ini "saldo ATM", diambil saat transaksi dibuat,
+            // apapun tanggal transaksinya (termasuk kalau backdate).
+            $bbQty = $this->itemLocationService->getTotalStock($itemId, $warehouseId);
+
             $data['item_no']   = $item->item_no;
             $data['item_desc'] = $item->item_desc;
             $data['item_uom']  = $item->item_uom;
-
             $data['status']     = 'NEW';
             $data['created_by'] = $createdBy;
 
-            // Tentukan arah mutasi
             [$inQty, $outQty] = $this->resolveDirection($data, $transQty);
-
             $data['in_qty']  = $inQty;
             $data['out_qty'] = $outQty;
 
-            // Saldo diisi oleh recalculate di stock_ledger
-            $data['bb_qty'] = 0;
-            $data['eb_qty'] = 0;
+            // Validasi stok tidak minus — cek terhadap kondisi SEKARANG
+            if ($outQty > $bbQty) {
+                throw new \Exception(
+                    "Stok tidak mencukupi. Stok tersedia: " . number_format($bbQty, 2, ',', '.') .
+                        ", dibutuhkan: " . number_format($outQty, 2, ',', '.')
+                );
+            }
+
+            $ebQty = $bbQty + $inQty - $outQty;
+
+            $data['bb_qty'] = $bbQty;
+            $data['eb_qty'] = $ebQty;
 
             $transaction = $this->transactionRepository->create($data);
 
-            // Terapkan perubahan stok fisik
+            // Terapkan perubahan fisik ke item_locations
             $this->applyStockMovement($transaction, $data);
 
-            // Catat ke ledger + recalculate.
-            // Kalau ada saldo minus, exception dilempar di sini dan
-            // seluruh DB::transaction ini di-rollback.
+            // Arsip ke ledger — murni catatan riwayat, tidak ada recalculate
             $this->stockLedgerService->record([
-                'item_id'      => $transaction->item_id,
-                'warehouse_id' => $transaction->warehouse_id,
+                'item_id'      => $itemId,
+                'warehouse_id' => $warehouseId,
                 'trans_date'   => $transDate->toDateString(),
-                'in_qty'       => $transaction->in_qty,
-                'out_qty'      => $transaction->out_qty,
+                'in_qty'       => $inQty,
+                'out_qty'      => $outQty,
+                'bb_qty'       => $bbQty,
+                'eb_qty'       => $ebQty,
                 'doc_type'     => $transaction->doc_type,
                 'ref_type'     => StockLedger::REF_TRANSACTION,
                 'ref_id'       => $transaction->id,
@@ -103,29 +117,19 @@ class TransactionService implements TransactionServiceInterface
                 );
             }
 
-            $itemId      = (int) $transaction->item_id;
-            $warehouseId = (int) $transaction->warehouse_id;
-            $transDate   = Carbon::parse($transaction->trans_date);
-
             $this->revertPorcLot($transaction);
 
             $this->transactionRepository->delete($id);
 
-            $this->stockLedgerService->removeByRef(
-                StockLedger::REF_TRANSACTION,
-                $id,
-                $itemId,
-                $warehouseId,
-                $transDate
-            );
+            // Hapus arsip ledger-nya juga — tidak ada recalculate karena
+            // bb_qty/eb_qty transaksi lain sudah final saat dibuat,
+            // tidak saling bergantung satu sama lain.
+            $this->stockLedgerRepository->deleteByRef(StockLedger::REF_TRANSACTION, $id);
 
             return true;
         });
     }
 
-    /**
-     * Tentukan in_qty / out_qty berdasarkan jenis transaksi.
-     */
     private function resolveDirection(array $data, float $transQty): array
     {
         switch ($data['doc_type']) {
@@ -146,12 +150,7 @@ class TransactionService implements TransactionServiceInterface
     }
 
     /**
-     * Terapkan perubahan stok ke item_locations.
-     *
-     * PORC    → buat lot baru di warehouse
-     * CONS    → ambil FEFO, bisa memecah beberapa lot
-     * ADJ in  → tambah ke lot yang dipilih user
-     * ADJ out → kurangi dari lot yang dipilih user
+     * Terapkan perubahan ke item_locations — inilah "sumber kebenaran" stok.
      */
     private function applyStockMovement(Transaction $transaction, array $data): void
     {
@@ -162,7 +161,6 @@ class TransactionService implements TransactionServiceInterface
                     'warehouse_id'       => $transaction->warehouse_id,
                     'vendor_lot'         => $data['vendor_lot'] ?? null,
                     'production_date'    => $data['production_date'] ?? null,
-                    'exp_date'           => $data['exp_date'] ?? null,
                     'qty_weight'         => $transaction->in_qty,
                     'qty_unit'           => $data['qty_unit'] ?? null,
                     'package'            => $data['package'] ?? null,
@@ -187,8 +185,6 @@ class TransactionService implements TransactionServiceInterface
                 break;
 
             case Transaction::DOC_ADJ:
-                // Adjustment selalu menunjuk lot spesifik, karena sifatnya
-                // mengoreksi kesalahan input pada lot tertentu
                 if (empty($data['item_location_id'])) {
                     throw new \Exception("Adjustment harus memilih lot yang akan dikoreksi.");
                 }
@@ -211,10 +207,6 @@ class TransactionService implements TransactionServiceInterface
         }
     }
 
-    /**
-     * Kembalikan lot yang dibuat oleh transaksi PORC saat transaksi dihapus.
-     * Hanya boleh kalau stoknya masih utuh (belum terpakai transaksi lain).
-     */
     private function revertPorcLot(Transaction $transaction): void
     {
         $lot = ItemLocation::where('item_id', $transaction->item_id)

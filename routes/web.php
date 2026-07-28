@@ -4,6 +4,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemLocationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
@@ -62,11 +63,33 @@ Route::middleware(['auth', 'can:manage-item-locations'])->group(function () {
     Route::resource('item-locations', ItemLocationController::class)->except('show');
 });
 
-// Route::middleware(['auth', 'can:create-transaction'])->group(function () {
-//     Route::get('transactions/get-lots', [TransactionController::class, 'getLots'])->name('transactions.get-lots');
-//     Route::get('transactions/get-stock', [TransactionController::class, 'getStock'])->name('transactions.get-stock');
-//     Route::resource('transactions', TransactionController::class)->only(['index', 'create', 'store', 'destroy']);
-// });
+
+
+// Transaction routes
+Route::middleware(['auth', 'can:create-transaction'])->group(function () {
+
+    // Daftar semua transaksi
+    Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
+
+    // AJAX helpers
+    Route::get('transactions/get-stock', [TransactionController::class, 'getStock'])->name('transactions.get-stock');
+    Route::get('transactions/get-lots', [TransactionController::class, 'getLots'])->name('transactions.get-lots');
+
+    // PORC — Supply Oil
+    Route::get('transactions/supply-oil', [TransactionController::class, 'createPorc'])->name('transactions.porc.create');
+    Route::post('transactions/supply-oil', [TransactionController::class, 'storePorc'])->name('transactions.porc.store');
+
+    // CONS — Pemakaian
+    Route::get('transactions/pemakaian', [TransactionController::class, 'createCons'])->name('transactions.cons.create');
+    Route::post('transactions/pemakaian', [TransactionController::class, 'storeCons'])->name('transactions.cons.store');
+
+    // ADJ — Adjustment
+    Route::get('transactions/adjustment', [TransactionController::class, 'createAdj'])->name('transactions.adj.create');
+    Route::post('transactions/adjustment', [TransactionController::class, 'storeAdj'])->name('transactions.adj.store');
+
+    // Hapus (hanya PORC)
+    Route::delete('transactions/{id}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
+});
 
 // Route::middleware(['auth', 'can:manage-transfer-request'])->group(function () {
 //     Route::resource('transfer-requests', TransferRequestController::class);

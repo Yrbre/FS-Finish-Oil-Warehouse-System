@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ItemLocationRequest;
+use App\Models\StockLedger;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\ItemServiceInterface;
+use App\Services\Interfaces\StockLedgerServiceInterface;
 use App\Services\Interfaces\WarehouseServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -16,15 +19,18 @@ class ItemLocationController extends Controller
     protected ItemLocationServiceInterface $itemLocationService;
     protected ItemServiceInterface $itemService;
     protected WarehouseServiceInterface $warehouseService;
+    protected StockLedgerServiceInterface $stockLedgerService;
 
     public function __construct(
         ItemLocationServiceInterface $itemLocationService,
         ItemServiceInterface $itemService,
-        WarehouseServiceInterface $warehouseService
+        WarehouseServiceInterface $warehouseService,
+        StockLedgerServiceInterface $stockLedgerService
     ) {
         $this->itemLocationService = $itemLocationService;
         $this->itemService         = $itemService;
         $this->warehouseService    = $warehouseService;
+        $this->stockLedgerService  = $stockLedgerService;
     }
 
     public function index(Request $request)
@@ -81,10 +87,36 @@ class ItemLocationController extends Controller
     public function store(ItemLocationRequest $request)
     {
         try {
-            $data = $request->validated();
-            $data['is_warehouse_stock'] = true;
+            DB::transaction(function () use ($request) {
+                $data = $request->validated();
+                $data['is_warehouse_stock'] = true;
 
-            $this->itemLocationService->create($data);
+                // bb_qty = stok item+gudang ini SEBELUM stok baru ditambahkan
+                $bbQty = $this->itemLocationService->getTotalStock(
+                    (int) $data['item_id'],
+                    (int) $data['warehouse_id']
+                );
+                $qty   = (float) $data['qty_weight'];
+                $ebQty = $bbQty + $qty;
+
+                $itemLocation = $this->itemLocationService->create($data);
+
+                // Arsipkan sebagai stok pembuka (bukan dari vendor/PORC),
+                // supaya kartu stok bulan pertama tidak menampilkan 0
+                // padahal fisiknya sudah ada barang.
+                $this->stockLedgerService->record([
+                    'item_id'      => $data['item_id'],
+                    'warehouse_id' => $data['warehouse_id'],
+                    'trans_date'   => $data['received_date'] ?? now()->toDateString(),
+                    'in_qty'       => $qty,
+                    'out_qty'      => 0,
+                    'bb_qty'       => $bbQty,
+                    'eb_qty'       => $ebQty,
+                    'doc_type'     => StockLedger::DOC_OPENING,
+                    'ref_type'     => StockLedger::REF_OPENING,
+                    'ref_id'       => $itemLocation->id, // nunjuk ke lot yang baru dibuat
+                ]);
+            });
 
             return redirect()->route('item-locations.index')
                 ->with('success', 'Stok gudang berhasil ditambahkan.');

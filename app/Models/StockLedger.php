@@ -12,6 +12,7 @@ class StockLedger extends Model
     protected $table = 'stock_ledger';
 
     // Jenis mutasi
+    const DOC_OPENING      = 'OPENING'; // stok awal (migrasi data, bukan dari vendor)
     const DOC_PORC         = 'PORC';
     const DOC_CONS         = 'CONS';
     const DOC_ADJ          = 'ADJ';
@@ -22,6 +23,7 @@ class StockLedger extends Model
     const REF_TRANSACTION  = 'transaction';   // → transactions
     const REF_TRANSFER_IN  = 'transfer_in';   // → transfer_requests
     const REF_TRANSFER_OUT = 'transfer_out';  // → transfer_requests
+    const REF_OPENING      = 'opening';       // → item_locations (stok awal manual, tanpa transaksi asal)
 
     protected $fillable = [
         'item_id',
@@ -59,7 +61,7 @@ class StockLedger extends Model
      */
     public static function inTypes(): array
     {
-        return [self::DOC_PORC, self::DOC_TRANSFER_IN];
+        return [self::DOC_PORC, self::DOC_TRANSFER_IN, self::DOC_OPENING];
     }
 
     /**

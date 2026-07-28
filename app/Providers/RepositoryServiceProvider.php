@@ -3,12 +3,12 @@
 namespace App\Providers;
 
 
-use App\Repositories\Eloquent\TransferRequestRepository;
 use App\Repositories\Eloquents\DepartmentRepository;
 use App\Repositories\Eloquents\ItemLocationRepository;
 use App\Repositories\Eloquents\ItemRepository;
 use App\Repositories\Eloquents\StockLedgerRepository;
 use App\Repositories\Eloquents\TransactionRepository;
+use App\Repositories\Eloquents\TransferRequestRepository;
 use App\Repositories\Eloquents\WarehouseRepository;
 use App\Repositories\Interfaces\DepartmentRepositoryInterface;
 use App\Repositories\Interfaces\ItemLocationRepositoryInterface;
