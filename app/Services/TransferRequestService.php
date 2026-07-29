@@ -52,7 +52,6 @@ class TransferRequestService implements TransferRequestServiceInterface
 
         $remainingQty = 0.0;
 
-        // Gudang tujuan dikecualikan — tidak masuk akal transfer ke diri sendiri
         $allocation = $this->itemLocationService->allocateFefoAcrossWarehouses(
             (int) $request->item_id,
             (float) $request->requested_qty,
@@ -87,60 +86,67 @@ class TransferRequestService implements TransferRequestServiceInterface
                 );
             }
 
-            $transDate = $effectiveDate
-                ? Carbon::parse($effectiveDate)
-                : now();
+            $transDate = $effectiveDate ? Carbon::parse($effectiveDate) : now();
+
+            // Kelompokkan alokasi FEFO per warehouse asal — supaya bb_qty
+            // dihitung 1x per warehouse (kondisi SEBELUM lot-lot di warehouse
+            // itu dikurangi), bukan per lot.
+            $groupedByWarehouse = collect($recommendation['allocation'])
+                ->groupBy(fn($row) => $row['item_location']->warehouse_id);
 
             $details = [];
 
-            foreach ($recommendation['allocation'] as $row) {
-                $lot   = $row['item_location'];
-                $taken = $row['qty_to_take'];
+            foreach ($groupedByWarehouse as $warehouseId => $rows) {
+                $warehouseId = (int) $warehouseId;
 
-                // Kurangi stok di gudang asal
-                $this->itemLocationService->deductLot($lot->id, $taken);
+                // bb_qty = stok warehouse ini SEBELUM dikurangi transfer ini
+                $bbQty = $this->itemLocationService->getTotalStock((int) $request->item_id, $warehouseId);
 
-                // Proporsi qty_unit mengikuti proporsi berat yang diambil,
-                // supaya jumlah kemasan yang dikirim ikut tercatat
-                $unitRatio = (float) $lot->qty_weight > 0
-                    ? $taken / (float) $lot->qty_weight
-                    : 0;
+                $totalTakenFromWarehouse = 0.0;
 
-                $details[] = [
-                    'transfer_request_id' => $request->id,
-                    'item_location_id'    => $lot->id,
-                    'source_warehouse_id' => $lot->warehouse_id,
-                    'vendor_lot'          => $lot->vendor_lot,
-                    'exp_date'            => $lot->exp_date?->toDateString(),
-                    'production_date'     => $lot->production_date?->toDateString(),
-                    'package'             => $lot->package,
-                    'qty_taken'           => $taken,
-                    'qty_unit'            => round((float) $lot->qty_unit * $unitRatio, 2),
-                    'created_at'          => now(),
-                    'updated_at'          => now(),
-                ];
-            }
+                foreach ($rows as $row) {
+                    $lot   = $row['item_location'];
+                    $taken = $row['qty_to_take'];
 
-            $this->transferRequestRepository->createDetails($details);
+                    $this->itemLocationService->deductLot($lot->id, $taken);
+                    $totalTakenFromWarehouse += $taken;
 
-            // Catat mutasi keluar — 1 baris ledger per gudang asal,
-            // karena saldo dihitung per item + warehouse
-            $perWarehouse = collect($details)
-                ->groupBy('source_warehouse_id')
-                ->map(fn($rows) => collect($rows)->sum('qty_taken'));
+                    $unitRatio = (float) $lot->qty_weight > 0 ? $taken / (float) $lot->qty_weight : 0;
 
-            foreach ($perWarehouse as $warehouseId => $totalQty) {
+                    $details[] = [
+                        'transfer_request_id' => $request->id,
+                        'item_location_id'    => $lot->id,
+                        'source_warehouse_id' => $warehouseId,
+                        'vendor_lot'          => $lot->vendor_lot,
+                        'exp_date'            => $lot->exp_date?->toDateString(),
+                        'production_date'     => $lot->production_date?->toDateString(),
+                        'package'             => $lot->package,
+                        'qty_taken'           => $taken,
+                        'qty_unit'            => round((float) $lot->qty_unit * $unitRatio, 2),
+                        'created_at'          => now(),
+                        'updated_at'          => now(),
+                    ];
+                }
+
+                $ebQty = $bbQty - $totalTakenFromWarehouse;
+
+                // Arsip riwayat — bb/eb ini kondisi NYATA warehouse itu saat
+                // transfer diproses, bukan hasil recalculate.
                 $this->stockLedgerService->record([
                     'item_id'      => $request->item_id,
                     'warehouse_id' => $warehouseId,
                     'trans_date'   => $transDate->toDateString(),
                     'in_qty'       => 0,
-                    'out_qty'      => $totalQty,
+                    'out_qty'      => $totalTakenFromWarehouse,
+                    'bb_qty'       => $bbQty,
+                    'eb_qty'       => $ebQty,
                     'doc_type'     => StockLedger::DOC_TRANSFER_OUT,
                     'ref_type'     => StockLedger::REF_TRANSFER_OUT,
                     'ref_id'       => $request->id,
                 ]);
             }
+
+            $this->transferRequestRepository->createDetails($details);
 
             return $this->transferRequestRepository->update($id, [
                 'status'        => TransferRequest::STATUS_IN_TRANSIT,
@@ -160,11 +166,8 @@ class TransferRequestService implements TransferRequestServiceInterface
                 throw new \Exception("Barang belum dikirim atau sudah diterima sebelumnya.");
             }
 
-            $transDate = $effectiveDate
-                ? Carbon::parse($effectiveDate)
-                : now();
+            $transDate = $effectiveDate ? Carbon::parse($effectiveDate) : now();
 
-            // Tanggal terima tidak boleh mendahului tanggal kirim
             if ($request->approved_date && $transDate->lt($request->approved_date)) {
                 throw new \Exception(
                     "Tanggal terima tidak boleh sebelum tanggal kirim (" .
@@ -172,15 +175,18 @@ class TransferRequestService implements TransferRequestServiceInterface
                 );
             }
 
+            $destWarehouseId = (int) $request->destination_warehouse_id;
+
+            // bb_qty = stok gudang tujuan SEBELUM barang ini masuk
+            $bbQty = $this->itemLocationService->getTotalStock((int) $request->item_id, $destWarehouseId);
+
             $details  = $this->transferRequestRepository->getDetails($id);
             $totalQty = 0.0;
 
             foreach ($details as $detail) {
-                // Lot dibuat ulang di gudang tujuan dengan identitas yang sama.
-                // Kalau lot yang sama sudah ada di sana, qty digabung.
                 $destLot = $this->itemLocationService->addOrMergeLot(
                     (int) $request->item_id,
-                    (int) $request->destination_warehouse_id,
+                    $destWarehouseId,
                     [
                         'vendor_lot'      => $detail->vendor_lot,
                         'exp_date'        => $detail->exp_date?->toDateString(),
@@ -192,19 +198,21 @@ class TransferRequestService implements TransferRequestServiceInterface
                     ]
                 );
 
-                // Simpan referensi lot tujuan supaya jejaknya lengkap
                 $detail->update(['dest_item_location_id' => $destLot->id]);
 
                 $totalQty += (float) $detail->qty_taken;
             }
 
-            // Mutasi masuk cukup 1 baris — gudang tujuan hanya satu
+            $ebQty = $bbQty + $totalQty;
+
             $this->stockLedgerService->record([
                 'item_id'      => $request->item_id,
-                'warehouse_id' => $request->destination_warehouse_id,
+                'warehouse_id' => $destWarehouseId,
                 'trans_date'   => $transDate->toDateString(),
                 'in_qty'       => $totalQty,
                 'out_qty'      => 0,
+                'bb_qty'       => $bbQty,
+                'eb_qty'       => $ebQty,
                 'doc_type'     => StockLedger::DOC_TRANSFER_IN,
                 'ref_type'     => StockLedger::REF_TRANSFER_IN,
                 'ref_id'       => $request->id,
@@ -246,9 +254,7 @@ class TransferRequestService implements TransferRequestServiceInterface
         }
 
         if (! $request->isCancellable()) {
-            throw new \Exception(
-                "Request tidak dapat dibatalkan karena sudah diproses."
-            );
+            throw new \Exception("Request tidak dapat dibatalkan karena sudah diproses.");
         }
 
         return $this->transferRequestRepository->update($id, [
@@ -258,10 +264,6 @@ class TransferRequestService implements TransferRequestServiceInterface
         ]);
     }
 
-    /**
-     * Pastikan user terdaftar sebagai approver transfer (IMC).
-     * Dicek ulang di service, bukan hanya di middleware route.
-     */
     private function guardApprover(int $userId): void
     {
         if (! $this->transferRequestRepository->isApprover($userId)) {

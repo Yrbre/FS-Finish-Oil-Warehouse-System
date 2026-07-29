@@ -17,24 +17,19 @@ class StockLedgerService implements StockLedgerServiceInterface
 
     public function record(array $data)
     {
-        // Murni tulis — bb_qty/eb_qty sudah dihitung final oleh pemanggil
-        // dari kondisi item_locations saat transaksi dibuat.
         return $this->stockLedgerRepository->create($data);
     }
 
-    public function getMonthlyStockCard(int $itemId, int $month, int $year, ?int $warehouseId = null)
+    public function getMonthlyStockCard(int $itemId, int $month, int $year, ?array $warehouseIds = null)
     {
         $startDate = Carbon::create($year, $month, 1)->startOfDay();
         $endDate   = $startDate->copy()->endOfMonth();
 
-        // Saldo awal bulan = akumulasi arsip sebelum tanggal 1.
-        // Ini murni untuk TAMPILAN laporan, tidak mempengaruhi transaksi baru.
-        $runningBalance = $warehouseId
-            ? $this->stockLedgerRepository->getBalanceBefore($itemId, $warehouseId, $startDate)
-            : $this->stockLedgerRepository->getBalanceBeforeAllWarehouses($itemId, $startDate);
+        $runningBalance = $this->stockLedgerRepository
+            ->getBalanceBefore($itemId, $warehouseIds, $startDate);
 
         $mutations = $this->stockLedgerRepository
-            ->getDailyMutation($itemId, $startDate, $endDate, $warehouseId);
+            ->getDailyMutation($itemId, $startDate, $endDate, $warehouseIds);
 
         $stockCard = collect();
 

@@ -28,26 +28,17 @@ class StockLedgerRepository implements StockLedgerRepositoryInterface
             ->delete();
     }
 
-    public function getBalanceBefore(int $itemId, int $warehouseId, Carbon $date): float
+    public function getBalanceBefore(int $itemId, ?array $warehouseIds, Carbon $date): float
     {
         return (float) $this->model
             ->where('item_id', $itemId)
-            ->where('warehouse_id', $warehouseId)
+            ->when($warehouseIds, fn($q) => $q->whereIn('warehouse_id', $warehouseIds))
             ->where('trans_date', '<', $date->toDateString())
             ->selectRaw('COALESCE(SUM(in_qty) - SUM(out_qty), 0) as balance')
             ->value('balance');
     }
 
-    public function getBalanceBeforeAllWarehouses(int $itemId, Carbon $date): float
-    {
-        return (float) $this->model
-            ->where('item_id', $itemId)
-            ->where('trans_date', '<', $date->toDateString())
-            ->selectRaw('COALESCE(SUM(in_qty) - SUM(out_qty), 0) as balance')
-            ->value('balance');
-    }
-
-    public function getDailyMutation(int $itemId, Carbon $startDate, Carbon $endDate, ?int $warehouseId = null)
+    public function getDailyMutation(int $itemId, Carbon $startDate, Carbon $endDate, ?array $warehouseIds = null)
     {
         $inTypes  = "'" . implode("','", StockLedger::inTypes()) . "'";
         $outTypes = "'" . implode("','", StockLedger::outTypes()) . "'";
@@ -55,7 +46,7 @@ class StockLedgerRepository implements StockLedgerRepositoryInterface
 
         return $this->model
             ->where('item_id', $itemId)
-            ->when($warehouseId, fn($q) => $q->where('warehouse_id', $warehouseId))
+            ->when($warehouseIds, fn($q) => $q->whereIn('warehouse_id', $warehouseIds))
             ->whereBetween('trans_date', [$startDate->toDateString(), $endDate->toDateString()])
             ->selectRaw("
                 trans_date,

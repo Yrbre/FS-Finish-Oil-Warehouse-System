@@ -66,12 +66,12 @@
                                             class="ml-1">Supply Oil</span></a>
                                 </li>
                             @endcan
-                            {{-- @canany(['manage-transfer-request', 'approve-transfer'])
+                            @canany(['manage-transfer-request', 'approve-transfer'])
                                 <li>
                                     <a class="nav-link pl-lg-2" href="{{ route('transfer-requests.index') }}"><span
                                             class="ml-1">Transfer Request</span></a>
                                 </li>
-                            @endcanany --}}
+                            @endcanany
                         </ul>
                     </li>
                 @endcanany

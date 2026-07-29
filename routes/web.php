@@ -5,6 +5,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemLocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\TransferRequestController;
 use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
@@ -91,13 +92,28 @@ Route::middleware(['auth', 'can:create-transaction'])->group(function () {
     Route::delete('transactions/{id}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
 });
 
-// Route::middleware(['auth', 'can:manage-transfer-request'])->group(function () {
-//     Route::resource('transfer-requests', TransferRequestController::class);
-//     Route::post('transfer-requests/{id}/approve', [TransferRequestController::class, 'approve'])->name('transfer-requests.approve');
-//     Route::post('transfer-requests/{id}/receive', [TransferRequestController::class, 'receive'])->name('transfer-requests.receive');
-//     Route::post('transfer-requests/{id}/reject', [TransferRequestController::class, 'reject'])->name('transfer-requests.reject');
-//     Route::post('transfer-requests/{id}/cancel', [TransferRequestController::class, 'cancel'])->name('transfer-requests.cancel');
-// });
+Route::middleware(['auth'])->group(function () {
+
+    // manage-transfer-request: bisa buat & lihat request sendiri
+    // approve-transfer: bisa approve/reject (IMC)
+    // receive-transfer: bisa konfirmasi terima
+    Route::middleware('can:manage-transfer-request')->group(function () {
+        Route::get('transfer-requests', [TransferRequestController::class, 'index'])->name('transfer-requests.index');
+        Route::get('transfer-requests/create', [TransferRequestController::class, 'create'])->name('transfer-requests.create');
+        Route::post('transfer-requests', [TransferRequestController::class, 'store'])->name('transfer-requests.store');
+        Route::get('transfer-requests/{id}', [TransferRequestController::class, 'show'])->name('transfer-requests.show');
+        Route::post('transfer-requests/{id}/cancel', [TransferRequestController::class, 'cancel'])->name('transfer-requests.cancel');
+    });
+
+    Route::middleware('can:approve-transfer')->group(function () {
+        Route::post('transfer-requests/{id}/approve', [TransferRequestController::class, 'approve'])->name('transfer-requests.approve');
+        Route::post('transfer-requests/{id}/reject', [TransferRequestController::class, 'reject'])->name('transfer-requests.reject');
+    });
+
+    Route::middleware('can:receive-transfer')->group(function () {
+        Route::post('transfer-requests/{id}/receive', [TransferRequestController::class, 'receive'])->name('transfer-requests.receive');
+    });
+});
 
 // Route::middleware(['auth', 'can:view-reports'])->group(function () {
 //     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');

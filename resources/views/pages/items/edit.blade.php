@@ -35,6 +35,16 @@
                         </div>
 
                         <div class="form-group">
+                            <label for="item_glclass">GL CLASS <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control uppercase @error('item_glclass') is-invalid @enderror"
+                                id="item_glclass" name="item_glclass" value="{{ old('item_glclass', $item->item_glclass) }}"
+                                placeholder="Contoh: FINISH OIL" required>
+                            @error('item_glclass')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="form-group">
                             <label for="item_uom">Satuan (UOM) <span class="text-danger">*</span></label>
                             <input type="text" class="form-control uppercase @error('item_uom') is-invalid @enderror"
                                 id="item_uom" name="item_uom" value="{{ old('item_uom', $item->item_uom) }}" required>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ItemRequest;
+use App\Services\Interfaces\DepartmentServiceInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\ItemServiceInterface;
 use App\Services\Interfaces\StockLedgerServiceInterface;
@@ -17,17 +18,20 @@ class ItemController extends Controller
     protected ItemLocationServiceInterface $itemLocationService;
     protected StockLedgerServiceInterface $stockLedgerService;
     protected WarehouseServiceInterface $warehouseService;
+    protected DepartmentServiceInterface $departmentService;
 
     public function __construct(
         ItemServiceInterface $itemService,
         ItemLocationServiceInterface $itemLocationService,
         StockLedgerServiceInterface $stockLedgerService,
-        WarehouseServiceInterface $warehouseService
+        WarehouseServiceInterface $warehouseService,
+        DepartmentServiceInterface $departmentService
     ) {
         $this->itemService         = $itemService;
         $this->itemLocationService = $itemLocationService;
         $this->stockLedgerService  = $stockLedgerService;
         $this->warehouseService    = $warehouseService;
+        $this->departmentService   = $departmentService;
     }
 
     public function index(Request $request)
@@ -132,18 +136,39 @@ class ItemController extends Controller
     public function detail(string $id, Request $request)
     {
         try {
-            $month       = (int) $request->get('month', now()->month);
-            $year        = (int) $request->get('year', now()->year);
-            $warehouseId = $request->get('warehouse_id');
+            $month = (int) $request->get('month', now()->month);
+            $year  = (int) $request->get('year', now()->year);
 
-            $item = $this->itemService->getById((int) $id);
+            $item       = $this->itemService->getById((int) $id);
+            $departments = $this->departmentService->getAll()->get();
+            $warehouses  = $this->warehouseService->getAll()->get();
+
+            // Default ke department pertama kalau belum ada yang dipilih —
+            // supaya tidak pernah jatuh ke "sum semua gudang tanpa batas".
+            $departmentId = $request->get('department_id') ?: $departments->first()?->id;
+            $warehouseId  = $request->get('warehouse_id');
+
+            // Resolve warehouse mana saja yang ikut dijumlah:
+            // - kalau user pilih 1 gudang spesifik → cuma gudang itu
+            // - kalau tidak → semua gudang milik department yang dipilih
+            if ($warehouseId) {
+                $warehouseIds = [(int) $warehouseId];
+            } elseif ($departmentId) {
+                $warehouseIds = $this->warehouseService
+                    ->getByDepartment((int) $departmentId)
+                    ->pluck('id')
+                    ->all();
+            } else {
+                $warehouseIds = null;
+            }
 
             $stockCard = $this->stockLedgerService->getMonthlyStockCard(
                 (int) $id,
                 $month,
                 $year,
-                $warehouseId ? (int) $warehouseId : null
+                $warehouseIds
             );
+
 
             $summary = (object) [
                 'total_in'  => $stockCard->sum('in_qty'),
@@ -152,15 +177,15 @@ class ItemController extends Controller
                 'closing'   => $stockCard->last()->eb_qty,
             ];
 
-            $warehouses = $this->warehouseService->getAll()->get();
-
             return view('pages.items.detail', compact(
                 'item',
                 'stockCard',
                 'summary',
+                'departments',
                 'warehouses',
                 'month',
                 'year',
+                'departmentId',
                 'warehouseId'
             ));
         } catch (\Exception $e) {
