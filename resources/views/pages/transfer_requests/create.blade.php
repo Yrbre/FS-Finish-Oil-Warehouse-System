@@ -23,7 +23,8 @@
                                 <label>Item <span class="text-danger">*</span></label>
                                 <select class="form-control select2 @error('item_id') is-invalid @enderror" name="item_id"
                                     required>
-                                    <option value="">-- Pilih Item --</option>
+                                    <option value="">-- Pilih Item
+                                        --</option>
                                     @foreach ($items as $item)
                                         <option value="{{ $item->id }}"
                                             {{ old('item_id') == $item->id ? 'selected' : '' }}>
@@ -39,12 +40,12 @@
                             <div class="form-group col-md-6">
                                 <label>Gudang Tujuan <span class="text-danger">*</span></label>
                                 <select class="form-control select2 @error('destination_warehouse_id') is-invalid @enderror"
-                                    name="destination_warehouse_id" required>
+                                    name="destination_warehouse_id" id="select2-destination-warehouse" required>
                                     <option value="">-- Pilih Gudang --</option>
                                     @foreach ($warehouses as $wh)
                                         <option value="{{ $wh->id }}"
                                             {{ old('destination_warehouse_id') == $wh->id ? 'selected' : '' }}>
-                                            {{ $wh->name }}
+                                            {{ $wh->name }} - {{ $wh->tag }}
                                         </option>
                                     @endforeach
                                 </select>

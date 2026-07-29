@@ -67,7 +67,8 @@
 
                         <div class="form-group">
                             <label>Role <span class="text-danger">*</span></label>
-                            <select class="form-control @error('role') is-invalid @enderror" name="role" required>
+                            <select class="form-control select2 @error('role') is-invalid @enderror" name="role"
+                                required>
                                 <option value="">-- Pilih Role --</option>
                                 @foreach ($roles as $roleName)
                                     <option value="{{ $roleName }}" {{ old('role') == $roleName ? 'selected' : '' }}>

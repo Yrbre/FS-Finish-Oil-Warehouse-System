@@ -162,6 +162,8 @@ class TransferRequestService implements TransferRequestServiceInterface
         return DB::transaction(function () use ($id, $receivedBy, $effectiveDate) {
             $request = $this->transferRequestRepository->getById($id);
 
+            $demander_id = $request->details->first()?->itemLocation?->demander_id;
+
             if ($request->status !== TransferRequest::STATUS_IN_TRANSIT) {
                 throw new \Exception("Barang belum dikirim atau sudah diterima sebelumnya.");
             }
@@ -188,6 +190,7 @@ class TransferRequestService implements TransferRequestServiceInterface
                     (int) $request->item_id,
                     $destWarehouseId,
                     [
+                        'demander_id'     => $demander_id,
                         'vendor_lot'      => $detail->vendor_lot,
                         'exp_date'        => $detail->exp_date?->toDateString(),
                         'production_date' => $detail->production_date?->toDateString(),

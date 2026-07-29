@@ -34,6 +34,7 @@ class ItemLocationRequest extends FormRequest
         return [
             'item_id'         => ['required', 'exists:items,id'],
             'warehouse_id'    => ['required', 'exists:warehouses,id'],
+            'demander_id'     => ['required', 'exists:departments,id'],
             'vendor_lot'      => ['nullable', 'string', 'max:100'],
             'production_date' => ['nullable', 'date'],
             'qty_weight'      => ['required', 'numeric', 'min:0'],
@@ -49,6 +50,7 @@ class ItemLocationRequest extends FormRequest
         return [
             'item_id'         => 'item',
             'warehouse_id'    => 'gudang',
+            'demander_id'     => 'demander',
             'qty_weight'      => 'berat (qty)',
             'production_date' => 'tanggal produksi',
         ];

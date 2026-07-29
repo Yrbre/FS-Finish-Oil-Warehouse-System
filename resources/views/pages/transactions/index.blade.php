@@ -9,9 +9,11 @@
                     <h2 class="h5 page-title">Daftar Transaksi</h2>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('transactions.porc.create') }}" class="btn btn-success btn-sm">
-                        <span class="fe fe-plus fe-16 mr-1"></span>Supply Oil
-                    </a>
+                    @if (auth()->user()->hasRole('admin'))
+                        <a href="{{ route('transactions.porc.create') }}" class="btn btn-success btn-sm">
+                            <span class="fe fe-plus fe-16 mr-1"></span>Supply Oil
+                        </a>
+                    @endif
                     <a href="{{ route('transactions.cons.create') }}" class="btn btn-danger btn-sm">
                         <span class="fe fe-minus fe-16 mr-1"></span>Pemakaian
                     </a>
@@ -41,7 +43,8 @@
                                     <select id="filterWarehouse" class="form-control select2">
                                         <option value="">Semua Gudang</option>
                                         @foreach ($warehouses as $wh)
-                                            <option value="{{ $wh->id }}">{{ $wh->name }}</option>
+                                            <option value="{{ $wh->id }}">{{ $wh->name }} - {{ $wh->tag }}
+                                            </option>
                                         @endforeach
                                     </select>
                                 </div>

@@ -34,6 +34,23 @@
                             </div>
 
                             <div class="form-group col-md-6">
+                                <label>Demander<span class="text-danger">*</span></label>
+                                <select class="form-control select2 @error('demander_id') is-invalid @enderror"
+                                    name="demander_id" required>
+                                    <option value="">-- Pilih Demander --</option>
+                                    @foreach ($departments as $dept)
+                                        <option value="{{ $dept->id }}"
+                                            {{ old('demander_id') == $dept->id ? 'selected' : '' }}>
+                                            {{ $dept->code }} - {{ $dept->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('demander_id')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                            <div class="form-group col-md-6">
                                 <label>Gudang <span class="text-danger">*</span></label>
                                 <select class="form-control select2 @error('warehouse_id') is-invalid @enderror"
                                     name="warehouse_id" required>
@@ -41,7 +58,7 @@
                                     @foreach ($warehouses as $wh)
                                         <option value="{{ $wh->id }}"
                                             {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>
-                                            {{ $wh->name }}
+                                            {{ $wh->name }} - {{ $wh->tag }}
                                         </option>
                                     @endforeach
                                 </select>

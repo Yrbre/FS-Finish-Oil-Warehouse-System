@@ -14,6 +14,7 @@ class ItemLocation extends Model
     protected $fillable = [
         'item_id',
         'warehouse_id',
+        'demander_id',
         'vendor_lot',
         'production_date',
         'exp_date',
@@ -42,6 +43,11 @@ class ItemLocation extends Model
     public function warehouse()
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    public function demander()
+    {
+        return $this->belongsTo(Department::class, 'demander_id');
     }
 
     /**

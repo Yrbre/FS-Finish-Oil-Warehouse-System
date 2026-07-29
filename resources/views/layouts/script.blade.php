@@ -34,10 +34,24 @@
 
 <script>
     (function($) {
+        function initSelect2() {
+            // Inisialisasi SEMUA elemen .select2 yang belum di-init
+            $('.select2, .select2-multi').each(function() {
+                if ($(this).data('select2')) {
+                    return; // sudah pernah di-init, skip
+                }
+
+                $(this).select2({
+                    theme: 'bootstrap4',
+                    width: '100%',
+                    multiple: $(this).hasClass('select2-multi'),
+                });
+            });
+        }
+
         function refreshSelect2Width() {
             $('.select2, .select2-multi').each(function() {
                 const instance = $(this).data('select2');
-
                 if (instance) {
                     instance.$container.css('width', '100%');
                 }
@@ -45,6 +59,7 @@
         }
 
         $(document).ready(function() {
+            initSelect2();
             refreshSelect2Width();
         });
 

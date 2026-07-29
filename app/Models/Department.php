@@ -29,4 +29,9 @@ class Department extends Model
     {
         return $this->hasMany(TransferRequest::class);
     }
+
+    public function itemLocations()
+    {
+        return $this->hasMany(ItemLocation::class, 'demander_id');
+    }
 }

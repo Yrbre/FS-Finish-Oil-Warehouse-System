@@ -36,7 +36,7 @@
                     <div class="row">
                         <div class="col-md-3 mb-3">
                             <p class="small text-muted mb-1">Item</p>
-                            <strong>{{ $transferRequest->item->item_desc }}</strong>
+                            <strong>{{ $transferRequest->item->item_no }} / {{ $transferRequest->item->item_desc }}</strong>
                         </div>
                         <div class="col-md-2 mb-3">
                             <p class="small text-muted mb-1">Jumlah Diminta</p>
@@ -45,7 +45,8 @@
                         </div>
                         <div class="col-md-3 mb-3">
                             <p class="small text-muted mb-1">Gudang Tujuan</p>
-                            <strong>{{ $transferRequest->destinationWarehouse->name }}</strong>
+                            <strong>{{ $transferRequest->destinationWarehouse->name }} -
+                                {{ $transferRequest->destinationWarehouse->tag }}</strong>
                         </div>
                         <div class="col-md-2 mb-3">
                             <p class="small text-muted mb-1">Harus Sampai</p>
@@ -87,7 +88,8 @@
                                 <tbody>
                                     @forelse ($recommendation['allocation'] as $row)
                                         <tr>
-                                            <td>{{ $row['item_location']->warehouse->name }}</td>
+                                            <td>{{ $row['item_location']->warehouse->name }} -
+                                                {{ $row['item_location']->warehouse->tag }}</td>
                                             <td>{{ $row['item_location']->vendor_lot ?? '-' }}</td>
                                             <td>{{ $row['item_location']->exp_date?->format('d-m-Y') ?? '-' }}</td>
                                             <td class="text-right">{{ number_format($row['qty_to_take'], 2, ',', '.') }}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ItemLocationRequest;
 use App\Models\StockLedger;
+use App\Services\Interfaces\DepartmentServiceInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\ItemServiceInterface;
 use App\Services\Interfaces\StockLedgerServiceInterface;
@@ -20,17 +21,20 @@ class ItemLocationController extends Controller
     protected ItemServiceInterface $itemService;
     protected WarehouseServiceInterface $warehouseService;
     protected StockLedgerServiceInterface $stockLedgerService;
+    protected DepartmentServiceInterface $departmentService;
 
     public function __construct(
         ItemLocationServiceInterface $itemLocationService,
         ItemServiceInterface $itemService,
         WarehouseServiceInterface $warehouseService,
-        StockLedgerServiceInterface $stockLedgerService
+        StockLedgerServiceInterface $stockLedgerService,
+        DepartmentServiceInterface $departmentService
     ) {
         $this->itemLocationService = $itemLocationService;
         $this->itemService         = $itemService;
         $this->warehouseService    = $warehouseService;
         $this->stockLedgerService  = $stockLedgerService;
+        $this->departmentService   = $departmentService;
     }
 
     public function index(Request $request)
@@ -80,8 +84,9 @@ class ItemLocationController extends Controller
     {
         $items      = $this->itemService->getAll()->get();
         $warehouses = $this->warehouseService->getAll()->get();
+        $departments = $this->departmentService->getAll()->get();
 
-        return view('pages.item_locations.create', compact('items', 'warehouses'));
+        return view('pages.item_locations.create', compact('items', 'warehouses', 'departments'));
     }
 
     public function store(ItemLocationRequest $request)
@@ -133,8 +138,9 @@ class ItemLocationController extends Controller
             $itemLocation = $this->itemLocationService->getById((int) $id);
             $items        = $this->itemService->getAll()->get();
             $warehouses   = $this->warehouseService->getAll()->get();
+            $departments  = $this->departmentService->getAll()->get();
 
-            return view('pages.item_locations.edit', compact('itemLocation', 'items', 'warehouses'));
+            return view('pages.item_locations.edit', compact('itemLocation', 'items', 'warehouses', 'departments'));
         } catch (\Exception $e) {
             Log::error('Gagal membuka form edit item location: ' . $e->getMessage());
 
