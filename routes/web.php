@@ -6,6 +6,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemLocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TransferRequestController;
 use App\Http\Controllers\UserController;
@@ -126,8 +127,8 @@ Route::middleware(['auth', 'can:manage-users'])->group(function () {
     Route::resource('users', UserController::class)->except('show');
 });
 
-// Route::middleware(['auth', 'can:manage-roles'])->group(function () {
-//     Route::resource('roles', RoleController::class)->except('show');
-// });
+Route::middleware(['auth', 'can:manage-roles'])->group(function () {
+    Route::resource('roles', RoleController::class)->except('show');
+});
 
 require __DIR__ . '/auth.php';

@@ -48,6 +48,10 @@
                                 <a class="nav-link pl-lg-2" href="{{ route('users.index') }}"><span
                                         class="ml-1">Users</span></a>
                             @endcan
+                            @can('manage-roles')
+                                <a class="nav-link pl-lg-2" href="{{ route('roles.index') }}"><span
+                                        class="ml-1">Roles</span></a>
+                            @endcan
                         </div>
                     </li>
                 @endcanany
@@ -84,7 +88,8 @@
                             <span class="ml-lg-2">Inventory</span>
                         </a>
                         <div class="dropdown-menu" aria-labelledby="inventoryDropdown">
-                            <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span class="ml-1">Item
+                            <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span
+                                    class="ml-1">Item
                                     Onhand</span></a>
                         </div>
                     </li>
