@@ -18,6 +18,14 @@ class TransferRequest extends Model
     const STATUS_REJECTED   = 'rejected';
     const STATUS_CANCELLED  = 'cancelled';
 
+    /**
+     * Transfer selalu diambil dari gudang milik department dengan kode ini.
+     * Kalau suatu saat kebijakan berubah (misal ada 2 department sumber),
+     * ubah cukup di sini — tidak perlu ubah service.
+     */
+    const SOURCE_DEPARTMENT_CODE = 'IMC';
+
+
     protected $fillable = [
         'transfer_code',
         'item_id',

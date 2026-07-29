@@ -32,7 +32,7 @@ interface ItemLocationServiceInterface
     public function allocateFefoAcrossWarehouses(
         int $itemId,
         float $qtyNeeded,
-        ?int $excludeWarehouseId,
+        array $warehouseIds,
         float &$remainingQty
     ): array;
 

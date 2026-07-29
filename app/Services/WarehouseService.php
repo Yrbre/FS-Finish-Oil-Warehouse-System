@@ -50,4 +50,9 @@ class WarehouseService implements WarehouseServiceInterface
 
         return $this->warehouseRepository->delete($id);
     }
+
+    public function getIdsByDepartmentCode(string $departmentCode): array
+    {
+        return $this->warehouseRepository->getIdsByDepartmentCode($departmentCode);
+    }
 }

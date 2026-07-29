@@ -8,6 +8,7 @@ use App\Repositories\Interfaces\TransferRequestRepositoryInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\StockLedgerServiceInterface;
 use App\Services\Interfaces\TransferRequestServiceInterface;
+use App\Services\Interfaces\WarehouseServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -16,15 +17,18 @@ class TransferRequestService implements TransferRequestServiceInterface
     protected TransferRequestRepositoryInterface $transferRequestRepository;
     protected ItemLocationServiceInterface $itemLocationService;
     protected StockLedgerServiceInterface $stockLedgerService;
+    protected WarehouseServiceInterface $warehouseService;
 
     public function __construct(
         TransferRequestRepositoryInterface $transferRequestRepository,
         ItemLocationServiceInterface $itemLocationService,
-        StockLedgerServiceInterface $stockLedgerService
+        StockLedgerServiceInterface $stockLedgerService,
+        WarehouseServiceInterface $warehouseService
     ) {
         $this->transferRequestRepository = $transferRequestRepository;
         $this->itemLocationService       = $itemLocationService;
         $this->stockLedgerService        = $stockLedgerService;
+        $this->warehouseService          = $warehouseService;
     }
 
     public function getAll()
@@ -50,12 +54,19 @@ class TransferRequestService implements TransferRequestServiceInterface
     {
         $request = $this->transferRequestRepository->getById($id);
 
+        // Sumber transfer hanya boleh dari gudang milik department IMC,
+        // dan gudang tujuan tidak boleh jadi sumber untuk dirinya sendiri.
+        $sourceWarehouseIds = array_values(array_diff(
+            $this->warehouseService->getIdsByDepartmentCode(TransferRequest::SOURCE_DEPARTMENT_CODE),
+            [(int) $request->destination_warehouse_id]
+        ));
+
         $remainingQty = 0.0;
 
         $allocation = $this->itemLocationService->allocateFefoAcrossWarehouses(
             (int) $request->item_id,
             (float) $request->requested_qty,
-            (int) $request->destination_warehouse_id,
+            $sourceWarehouseIds,
             $remainingQty
         );
 
@@ -81,7 +92,7 @@ class TransferRequestService implements TransferRequestServiceInterface
 
             if (! $recommendation['is_fulfilled']) {
                 throw new \Exception(
-                    "Stok di seluruh gudang tidak mencukupi. Kurang: " .
+                    "Stok di gudang IMC tidak mencukupi. Kurang: " .
                         number_format($recommendation['remaining_qty'], 2, ',', '.')
                 );
             }
@@ -162,8 +173,6 @@ class TransferRequestService implements TransferRequestServiceInterface
         return DB::transaction(function () use ($id, $receivedBy, $effectiveDate) {
             $request = $this->transferRequestRepository->getById($id);
 
-            $demander_id = $request->details->first()?->itemLocation?->demander_id;
-
             if ($request->status !== TransferRequest::STATUS_IN_TRANSIT) {
                 throw new \Exception("Barang belum dikirim atau sudah diterima sebelumnya.");
             }
@@ -179,6 +188,10 @@ class TransferRequestService implements TransferRequestServiceInterface
 
             $destWarehouseId = (int) $request->destination_warehouse_id;
 
+            // Lot baru di gudang tujuan diperuntukan bagi department yang
+            // MENGAJUKAN transfer ini — bukan department asal lot sumber.
+            $demanderId = $request->department_id;
+
             // bb_qty = stok gudang tujuan SEBELUM barang ini masuk
             $bbQty = $this->itemLocationService->getTotalStock((int) $request->item_id, $destWarehouseId);
 
@@ -190,7 +203,7 @@ class TransferRequestService implements TransferRequestServiceInterface
                     (int) $request->item_id,
                     $destWarehouseId,
                     [
-                        'demander_id'     => $demander_id,
+                        'demander_id'     => $demanderId,
                         'vendor_lot'      => $detail->vendor_lot,
                         'exp_date'        => $detail->exp_date?->toDateString(),
                         'production_date' => $detail->production_date?->toDateString(),

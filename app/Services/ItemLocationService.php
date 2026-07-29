@@ -87,16 +87,14 @@ class ItemLocationService implements ItemLocationServiceInterface
     public function allocateFefoAcrossWarehouses(
         int $itemId,
         float $qtyNeeded,
-        ?int $excludeWarehouseId,
+        array $warehouseIds,
         float &$remainingQty
     ): array {
         $lots = $this->itemLocationRepository
-            ->getFefoLotsAcrossWarehouses($itemId, $excludeWarehouseId);
+            ->getFefoLotsAcrossWarehouses($itemId, $warehouseIds);
 
         $allocation = $this->buildAllocation($lots, $qtyNeeded, $remaining);
 
-        // Sengaja tidak throw — pemanggil yang menentukan apa yang terjadi
-        // kalau stok seluruh gudang tidak mencukupi.
         $remainingQty = $remaining;
 
         return $allocation;

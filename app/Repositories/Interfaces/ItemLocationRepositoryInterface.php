@@ -26,10 +26,12 @@ interface ItemLocationRepositoryInterface
     public function getFefoLots(int $itemId, int $warehouseId);
 
     /**
-     * Lot yang masih ada stoknya di SEMUA warehouse, urut FEFO.
-     * Dipakai untuk rekomendasi Transfer (FEFO lintas warehouse).
+     * Lot aktif untuk 1 item, dibatasi HANYA pada warehouse_id yang ada
+     * di $warehouseIds (whitelist), urut FEFO.
+     * Dipakai untuk rekomendasi Transfer — sumbernya cuma boleh dari
+     * gudang-gudang tertentu (misal semua gudang milik department IMC).
      */
-    public function getFefoLotsAcrossWarehouses(int $itemId, ?int $excludeWarehouseId = null);
+    public function getFefoLotsAcrossWarehouses(int $itemId, array $warehouseIds);
 
     /**
      * Cari lot dengan vendor_lot & exp_date yang sama di warehouse tertentu.

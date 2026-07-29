@@ -45,4 +45,12 @@ class WarehouseRepository implements WarehouseRepositoryInterface
         $warehouse = $this->getById($id);
         $warehouse->delete();
     }
+
+    public function getIdsByDepartmentCode(string $departmentCode): array
+    {
+        return $this->model
+            ->whereHas('department', fn($q) => $q->where('code', $departmentCode))
+            ->pluck('id')
+            ->all();
+    }
 }

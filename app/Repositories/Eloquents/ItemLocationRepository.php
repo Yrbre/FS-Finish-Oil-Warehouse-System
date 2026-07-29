@@ -61,13 +61,17 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
             ->get();
     }
 
-    public function getFefoLotsAcrossWarehouses(int $itemId, ?int $excludeWarehouseId = null)
+    public function getFefoLotsAcrossWarehouses(int $itemId, array $warehouseIds)
     {
+        if (empty($warehouseIds)) {
+            return collect();
+        }
+
         return $this->model
             ->with('warehouse')
             ->where('item_id', $itemId)
+            ->whereIn('warehouse_id', $warehouseIds)
             ->available()
-            ->when($excludeWarehouseId, fn($q) => $q->where('warehouse_id', '!=', $excludeWarehouseId))
             ->fefo()
             ->get();
     }
