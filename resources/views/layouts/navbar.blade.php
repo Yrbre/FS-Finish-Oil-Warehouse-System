@@ -44,10 +44,10 @@
                                 <a class="nav-link pl-lg-2" href="{{ route('warehouses.index') }}"><span
                                         class="ml-1">Warehouses</span></a>
                             @endcan
-                            {{-- @can('manage-users')
+                            @can('manage-users')
                                 <a class="nav-link pl-lg-2" href="{{ route('users.index') }}"><span
                                         class="ml-1">Users</span></a>
-                            @endcan --}}
+                            @endcan
                         </div>
                     </li>
                 @endcanany

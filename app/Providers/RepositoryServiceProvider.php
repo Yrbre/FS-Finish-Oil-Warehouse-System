@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 
+use App\Repositories\Eloquents\UserRepository;
 use App\Repositories\Eloquents\DepartmentRepository;
 use App\Repositories\Eloquents\ItemLocationRepository;
 use App\Repositories\Eloquents\ItemRepository;
@@ -16,6 +17,7 @@ use App\Repositories\Interfaces\ItemRepositoryInterface;
 use App\Repositories\Interfaces\StockLedgerRepositoryInterface;
 use App\Repositories\Interfaces\TransactionRepositoryInterface;
 use App\Repositories\Interfaces\TransferRequestRepositoryInterface;
+use App\Repositories\Interfaces\UserRepositoryInterface;
 use App\Repositories\Interfaces\WarehouseRepositoryInterface;
 use App\Services\DepartmentService;
 use App\Services\Interfaces\DepartmentServiceInterface;
@@ -24,12 +26,14 @@ use App\Services\Interfaces\ItemServiceInterface;
 use App\Services\Interfaces\StockLedgerServiceInterface;
 use App\Services\Interfaces\TransactionServiceInterface;
 use App\Services\Interfaces\TransferRequestServiceInterface;
+use App\Services\Interfaces\UserServiceInterface;
 use App\Services\Interfaces\WarehouseServiceInterface;
 use App\Services\ItemLocationService;
 use App\Services\ItemService;
 use App\Services\StockLedgerService;
 use App\Services\TransactionService;
 use App\Services\TransferRequestService;
+use App\Services\UserService;
 use App\Services\WarehouseService;
 use Illuminate\Support\ServiceProvider;
 
@@ -55,6 +59,7 @@ class RepositoryServiceProvider extends ServiceProvider
         TransactionRepositoryInterface::class     => TransactionRepository::class,
         TransferRequestRepositoryInterface::class => TransferRequestRepository::class,
         StockLedgerRepositoryInterface::class     => StockLedgerRepository::class,
+        UserRepositoryInterface::class            => UserRepository::class,
 
         // Service
         DepartmentServiceInterface::class      => DepartmentService::class,
@@ -64,5 +69,6 @@ class RepositoryServiceProvider extends ServiceProvider
         TransactionServiceInterface::class     => TransactionService::class,
         TransferRequestServiceInterface::class => TransferRequestService::class,
         StockLedgerServiceInterface::class     => StockLedgerService::class,
+        UserServiceInterface::class            => UserService::class,
     ];
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\ItemLocationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TransferRequestController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
@@ -119,9 +120,9 @@ Route::middleware(['auth'])->group(function () {
 //     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
 // });
 
-// Route::middleware(['auth', 'can:manage-users'])->group(function () {
-//     Route::resource('users', UserController::class)->except('show');
-// });
+Route::middleware(['auth', 'can:manage-users'])->group(function () {
+    Route::resource('users', UserController::class)->except('show');
+});
 
 // Route::middleware(['auth', 'can:manage-roles'])->group(function () {
 //     Route::resource('roles', RoleController::class)->except('show');
