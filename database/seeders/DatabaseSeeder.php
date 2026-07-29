@@ -18,6 +18,9 @@ class DatabaseSeeder extends Seeder
     {
 
         $this->call(RolesAndPermissionSeeder::class);
+        $this->call(DepartmentSeeder::class);
+        $this->call(WarehouseSeeder::class);
+        $this->call(ItemSeeder::class);
 
         // Department awal — IMC sebagai pusat gudang (Gudang Finish Oil)
         $imcDepartment = Department::firstOrCreate(
