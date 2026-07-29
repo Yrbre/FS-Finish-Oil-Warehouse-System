@@ -47,4 +47,9 @@ interface ItemLocationServiceInterface
      * Kalau belum ada, dibuat record baru.
      */
     public function addOrMergeLot(int $itemId, int $warehouseId, array $lotData);
+
+    // Report
+    public function getGrandTotalStock(): float;
+    public function getNearExpiring(int $days = 30, int $limit = 10);
+    public function getStockSummaryByWarehouse();
 }

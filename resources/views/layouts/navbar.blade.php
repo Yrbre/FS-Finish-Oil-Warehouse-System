@@ -91,12 +91,12 @@
                 @endcan
 
                 {{-- Laporan --}}
-                {{-- @can('view-reports')
+                @can('view-reports')
                     <li class="nav-item">
                         <a href="{{ route('reports.index') }}"
                             class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">Laporan</a>
                     </li>
-                @endcan --}}
+                @endcan
 
             </ul>
         </div>

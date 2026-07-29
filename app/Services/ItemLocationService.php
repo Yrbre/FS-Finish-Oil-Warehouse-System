@@ -170,4 +170,20 @@ class ItemLocationService implements ItemLocationServiceInterface
 
         return $allocation;
     }
+
+    // REPORT
+    public function getGrandTotalStock(): float
+    {
+        return $this->itemLocationRepository->getGrandTotalStock();
+    }
+
+    public function getNearExpiring(int $days = 30, int $limit = 10)
+    {
+        return $this->itemLocationRepository->getNearExpiring($days, $limit);
+    }
+
+    public function getStockSummaryByWarehouse()
+    {
+        return $this->itemLocationRepository->getStockSummaryByWarehouse();
+    }
 }

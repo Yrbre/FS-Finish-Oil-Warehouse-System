@@ -81,4 +81,34 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
             ->where('exp_date', $expDate)
             ->first();
     }
+
+    // REPORT
+
+    public function getGrandTotalStock(): float
+    {
+        return (float) $this->model->sum('qty_weight');
+    }
+
+    public function getNearExpiring(int $days = 30, int $limit = 10)
+    {
+        return $this->model
+            ->with(['item', 'warehouse'])
+            ->where('qty_weight', '>', 0)
+            ->whereNotNull('exp_date')
+            ->where('exp_date', '<=', now()->addDays($days)->toDateString())
+            ->orderBy('exp_date', 'asc')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function getStockSummaryByWarehouse()
+    {
+        return $this->model
+            ->join('warehouses', 'warehouses.id', '=', 'item_locations.warehouse_id')
+            ->where('item_locations.qty_weight', '>', 0)
+            ->selectRaw('warehouses.id as warehouse_id, warehouses.name as warehouse_name, SUM(item_locations.qty_weight) as total_stock, COUNT(DISTINCT item_locations.item_id) as item_count')
+            ->groupBy('warehouses.id', 'warehouses.name')
+            ->orderBy('warehouses.name')
+            ->get();
+    }
 }

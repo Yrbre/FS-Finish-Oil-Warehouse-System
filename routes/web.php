@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemLocationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\TransferRequestController;
 use App\Http\Controllers\UserController;
@@ -20,9 +22,9 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -116,9 +118,9 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-// Route::middleware(['auth', 'can:view-reports'])->group(function () {
-//     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
-// });
+Route::middleware(['auth', 'can:view-reports'])->group(function () {
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+});
 
 Route::middleware(['auth', 'can:manage-users'])->group(function () {
     Route::resource('users', UserController::class)->except('show');
