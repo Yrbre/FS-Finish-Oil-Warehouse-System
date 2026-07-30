@@ -90,7 +90,11 @@ class TransactionController extends Controller
     public function createPorc()
     {
         $items      = $this->itemService->getAll()->get();
-        $warehouses = $this->warehouseService->getAll()->get();
+        if (auth()->user()->role === 'admin') {
+            $warehouses = $this->warehouseService->getAll()->get();
+        } else {
+            $warehouses = $this->warehouseService->getByDepartment(auth()->user()->department_id);
+        }
 
         return view('pages.transactions.porc', compact('items', 'warehouses'));
     }
@@ -117,7 +121,11 @@ class TransactionController extends Controller
     public function createCons()
     {
         $items      = $this->itemService->getAll()->get();
-        $warehouses = $this->warehouseService->getAll()->get();
+        if (auth()->user()->role === 'admin') {
+            $warehouses = $this->warehouseService->getAll()->get();
+        } else {
+            $warehouses = $this->warehouseService->getByDepartment(auth()->user()->department_id);
+        }
 
         return view('pages.transactions.cons', compact('items', 'warehouses'));
     }

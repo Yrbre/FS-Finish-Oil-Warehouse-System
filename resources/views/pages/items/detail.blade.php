@@ -39,18 +39,41 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <label for="warehouse_id" class="small text-muted">Gudang</label>
-                            <select name="warehouse_id" id="warehouse_id" class="form-control select2">
-                                <option value="">Semua Gudang</option>
-                                @foreach ($warehouses as $wh)
-                                    <option value="{{ $wh->id }}" {{ $warehouseId == $wh->id ? 'selected' : '' }}>
-                                        {{ $wh->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-3">
+
+                        @if ($isFullAccess)
+                            <div class="col-md-3">
+                                <label for="department_id" class="small text-muted">Department</label>
+                                <select name="department_id" id="department_id" class="form-control select2">
+                                    @foreach ($departments as $dept)
+                                        <option value="{{ $dept->id }}"
+                                            {{ $departmentId == $dept->id ? 'selected' : '' }}>
+                                            {{ $dept->code }} - {{ $dept->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label for="warehouse_id" class="small text-muted">Gudang <small>(opsional)</small></label>
+                                <select name="warehouse_id" id="warehouse_id" class="form-control select2">
+                                    <option value="">Semua gudang di department</option>
+                                    @foreach ($warehouses as $wh)
+                                        <option value="{{ $wh->id }}" data-department="{{ $wh->department_id }}"
+                                            {{ $warehouseId == $wh->id ? 'selected' : '' }}>
+                                            {{ $wh->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @else
+                            <div class="col-md-5">
+                                <label class="small text-muted">Scope</label>
+                                <p class="form-control-plaintext">
+                                    <span class="">Gudang department Anda</span><br>
+                                </p>
+                            </div>
+                        @endif
+
+                        <div class="col-md-2">
                             <button type="submit" class="btn btn-primary btn-block">
                                 <span class="fe fe-filter fe-16 mr-2"></span>Tampilkan
                             </button>
@@ -135,3 +158,29 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+    <script>
+        // Tampilkan hanya gudang milik department yang dipilih
+        function filterWarehousesByDepartment() {
+            const deptId = $('#department_id').val();
+
+            $('#warehouse_id option').each(function() {
+                const optDept = $(this).data('department');
+                // Opsi "Semua gudang di department" (tanpa data-department) selalu tampil
+                if (typeof optDept === 'undefined') return;
+
+                $(this).toggle(String(optDept) === String(deptId));
+            });
+        }
+
+        $('#department_id').on('change', function() {
+            // Reset pilihan gudang spesifik saat department diganti,
+            // supaya tidak nyangkut ke gudang department lain
+            $('#warehouse_id').val('').trigger('change');
+            filterWarehousesByDepartment();
+        });
+
+        $(document).ready(filterWarehousesByDepartment);
+    </script>
+@endpush

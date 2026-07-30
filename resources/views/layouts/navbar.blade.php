@@ -25,7 +25,7 @@
                 </li>
 
                 {{-- Master Data — tampil kalau user punya salah satu permission master --}}
-                @canany(['manage-departments', 'manage-items', 'manage-users', 'manage-warehouses'])
+                @canany(['manage-departments', 'manage-warehouses', 'manage-users', 'manage-warehouses'])
                     <li class="nav-item dropdown">
                         <a href="#" id="masterDropdown" class="dropdown-toggle nav-link" role="button"
                             data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -36,10 +36,6 @@
                                 <a class="nav-link pl-lg-2" href="{{ route('departments.index') }}"><span
                                         class="ml-1">Department</span></a>
                             @endcan
-                            @can('manage-items')
-                                <a class="nav-link pl-lg-2" href="{{ route('items.index') }}"><span class="ml-1">Item
-                                        Oil</span></a>
-                            @endcan
                             @can('manage-warehouses')
                                 <a class="nav-link pl-lg-2" href="{{ route('warehouses.index') }}"><span
                                         class="ml-1">Warehouses</span></a>
@@ -48,11 +44,16 @@
                                 <a class="nav-link pl-lg-2" href="{{ route('users.index') }}"><span
                                         class="ml-1">Users</span></a>
                             @endcan
-                            @can('manage-roles')
-                                <a class="nav-link pl-lg-2" href="{{ route('roles.index') }}"><span
-                                        class="ml-1">Roles</span></a>
-                            @endcan
                         </div>
+                    </li>
+                @endcanany
+
+                {{-- Item Oil: admin/IMC (kelola master) ATAU staff (lihat kartu stok saja) --}}
+                @canany(['manage-items', 'create-transaction'])
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('items.index') }}">
+                            <span class="ml-lg-2">Item Oil</span>
+                        </a>
                     </li>
                 @endcanany
 
@@ -88,8 +89,7 @@
                             <span class="ml-lg-2">Inventory</span>
                         </a>
                         <div class="dropdown-menu" aria-labelledby="inventoryDropdown">
-                            <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span
-                                    class="ml-1">Item
+                            <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span class="ml-1">Item
                                     Onhand</span></a>
                         </div>
                     </li>

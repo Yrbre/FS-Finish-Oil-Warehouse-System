@@ -130,45 +130,74 @@ class ItemController extends Controller
     }
 
     /**
-     * Kartu stok bulanan — mutasi harian pemasukan & pengeluaran.
-     * Bisa difilter per gudang, atau gabungan semua gudang.
+     * Kartu stok bulanan.
+     *
+     * - User dengan permission 'manage-items' (admin/IMC): kartu lengkap,
+     *   bisa pilih department & warehouse manapun, semua jenis transaksi.
+     * - User lain yang cuma punya 'create-transaction' (staff): otomatis
+     *   ter-scope ke department dia sendiri, HANYA menghitung Transfer-in,
+     *   CONS, dan ADJ (PORC & Transfer-out diabaikan).
      */
     public function detail(string $id, Request $request)
     {
         try {
-            $month = (int) $request->get('month', now()->month);
-            $year  = (int) $request->get('year', now()->year);
-
-            $item       = $this->itemService->getById((int) $id);
-            $departments = $this->departmentService->getAll()->get();
-            $warehouses  = $this->warehouseService->getAll()->get();
-
-            // Default ke department pertama kalau belum ada yang dipilih —
-            // supaya tidak pernah jatuh ke "sum semua gudang tanpa batas".
-            $departmentId = $request->get('department_id') ?: $departments->first()?->id;
-            $warehouseId  = $request->get('warehouse_id');
-
-            // Resolve warehouse mana saja yang ikut dijumlah:
-            // - kalau user pilih 1 gudang spesifik → cuma gudang itu
-            // - kalau tidak → semua gudang milik department yang dipilih
-            if ($warehouseId) {
-                $warehouseIds = [(int) $warehouseId];
-            } elseif ($departmentId) {
-                $warehouseIds = $this->warehouseService
-                    ->getByDepartment((int) $departmentId)
-                    ->pluck('id')
-                    ->all();
-            } else {
-                $warehouseIds = null;
+            if (! auth()->user()->canAny(['manage-items', 'create-transaction'])) {
+                abort(403);
             }
 
-            $stockCard = $this->stockLedgerService->getMonthlyStockCard(
-                (int) $id,
-                $month,
-                $year,
-                $warehouseIds
-            );
+            $month = (int) $request->get('month', now()->month);
+            $year  = (int) $request->get('year', now()->year);
+            $item  = $this->itemService->getById((int) $id);
 
+            $isFullAccess = auth()->user()->can('manage-items');
+
+            if ($isFullAccess) {
+                $departments = $this->departmentService->getAll()->get();
+                $warehouses  = $this->warehouseService->getAll()->get();
+
+                $departmentId = $request->get('department_id') ?: $departments->first()?->id;
+                $warehouseId  = $request->get('warehouse_id');
+
+                if ($warehouseId) {
+                    $warehouseIds = [(int) $warehouseId];
+                } elseif ($departmentId) {
+                    $warehouseIds = $this->warehouseService
+                        ->getByDepartment((int) $departmentId)
+                        ->pluck('id')
+                        ->all();
+                } else {
+                    $warehouseIds = null;
+                }
+
+                $stockCard = $this->stockLedgerService->getMonthlyStockCard(
+                    (int) $id,
+                    $month,
+                    $year,
+                    $warehouseIds
+                );
+            } else {
+                // Staff: paksa scope ke department dia sendiri, tidak ada
+                // pilihan lain, dan pakai kalkulasi Transfer-in/CONS/ADJ saja.
+                $departments  = collect();
+                $warehouses   = collect();
+                $departmentId = auth()->user()->department_id;
+                $warehouseId  = null;
+
+                $warehouseIds = $departmentId
+                    ? $this->warehouseService->getByDepartment((int) $departmentId)->pluck('id')->all()
+                    : [];
+
+                if (empty($warehouseIds)) {
+                    throw new \Exception("Anda belum terdaftar di department manapun yang memiliki gudang.");
+                }
+
+                $stockCard = $this->stockLedgerService->getStaffMonthlyStockCard(
+                    (int) $id,
+                    $month,
+                    $year,
+                    $warehouseIds
+                );
+            }
 
             $summary = (object) [
                 'total_in'  => $stockCard->sum('in_qty'),
@@ -186,12 +215,13 @@ class ItemController extends Controller
                 'month',
                 'year',
                 'departmentId',
-                'warehouseId'
+                'warehouseId',
+                'isFullAccess'
             ));
         } catch (\Exception $e) {
             Log::error('Gagal menampilkan kartu stok: ' . $e->getMessage());
 
-            return redirect()->route('items.index')->with('error', 'Kartu stok tidak dapat ditampilkan.');
+            return redirect()->route('items.index')->with('error', 'Kartu stok tidak dapat ditampilkan: ' . $e->getMessage());
         }
     }
 

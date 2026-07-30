@@ -48,12 +48,22 @@ Route::middleware('auth')->group(function () {
         Route::resource('warehouses', WarehouseController::class)->except('show');
     });
 
-    Route::middleware('can:manage-items')->group(function () {
-        // Route spesifik sebelum resource supaya tidak ketabrak pola items/{item}
-        Route::get('items/get-stock', [ItemController::class, 'getStock'])->name('items.get-stock');
+    Route::middleware('auth')->group(function () {
+
+        // index & detail (kartu stok): admin/IMC ATAU staff (dicek di controller
+        // pakai canAny(['manage-items', 'create-transaction']))
+        Route::get('items', [ItemController::class, 'index'])->name('items.index');
         Route::get('items/{id}/detail', [ItemController::class, 'detail'])->name('items.detail');
 
-        Route::resource('items', ItemController::class)->except('show');
+        // CRUD item master — khusus manage-items
+        Route::middleware('can:manage-items')->group(function () {
+            Route::get('items/get-stock', [ItemController::class, 'getStock'])->name('items.get-stock');
+            Route::get('items/create', [ItemController::class, 'create'])->name('items.create');
+            Route::post('items', [ItemController::class, 'store'])->name('items.store');
+            Route::get('items/{id}/edit', [ItemController::class, 'edit'])->name('items.edit');
+            Route::put('items/{id}', [ItemController::class, 'update'])->name('items.update');
+            Route::delete('items/{id}', [ItemController::class, 'destroy'])->name('items.destroy');
+        });
     });
 });
 

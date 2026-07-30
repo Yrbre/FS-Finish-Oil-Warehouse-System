@@ -69,7 +69,12 @@ class TransferRequestController extends Controller
     public function create()
     {
         $items      = $this->itemService->getAll()->get();
-        $warehouses = $this->warehouseService->getAll()->get();
+
+        if (auth()->user()->role === 'admin') {
+            $warehouses = $this->warehouseService->getAll()->get();
+        } else {
+            $warehouses = $this->warehouseService->getByDepartment(auth()->user()->department_id);
+        }
 
         return view('pages.transfer_requests.create', compact('items', 'warehouses'));
     }

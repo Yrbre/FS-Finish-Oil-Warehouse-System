@@ -22,4 +22,17 @@ interface StockLedgerRepositoryInterface
      * $warehouseIds sama seperti di atas.
      */
     public function getDailyMutation(int $itemId, Carbon $startDate, Carbon $endDate, ?array $warehouseIds = null);
+
+    /**
+     * Versi khusus staff: saldo HANYA dari doc_type TRANSFER_IN, CONS, ADJ.
+     * PORC dan TRANSFER_OUT diabaikan (secara bisnis tidak pernah terjadi
+     * di gudang non-IMC, tapi tetap dijamin lewat filter ini).
+     */
+    public function getStaffBalanceBefore(int $itemId, array $warehouseIds, Carbon $date): float;
+
+    /**
+     * Versi khusus staff: mutasi harian HANYA TRANSFER_IN (kolom masuk),
+     * CONS (kolom keluar), ADJ (kolom adjustment terpisah).
+     */
+    public function getStaffDailyMutation(int $itemId, Carbon $startDate, Carbon $endDate, array $warehouseIds);
 }

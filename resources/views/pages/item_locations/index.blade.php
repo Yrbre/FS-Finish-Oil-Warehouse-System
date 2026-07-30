@@ -8,11 +8,13 @@
                 <div class="col">
                     <h2 class="h5 page-title">Stok Gudang (Item Onhand)</h2>
                 </div>
-                <div class="col-auto">
-                    <a href="{{ route('item-locations.create') }}" class="btn btn-primary btn-sm">
-                        <span class="fe fe-plus fe-16 mr-2"></span>Tambah Stok
-                    </a>
-                </div>
+                @hasrole('admin')
+                    <div class="col-auto">
+                        <a href="{{ route('item-locations.create') }}" class="btn btn-primary btn-sm">
+                            <span class="fe fe-plus fe-16 mr-2"></span>Tambah Stok
+                        </a>
+                    </div>
+                @endhasrole
             </div>
 
             <div class="row my-4">
