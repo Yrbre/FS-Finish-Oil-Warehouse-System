@@ -29,7 +29,7 @@ class PorcTransactionRequest extends FormRequest
         return [
             'item_id'         => ['required', 'exists:items,id'],
             'warehouse_id'    => ['required', 'exists:warehouses,id'],
-            'trans_date'      => ['required', 'date', 'before_or_equal:today'],
+            'trans_date'      => ['required', 'date'],
             'trans_qty'       => ['required', 'numeric', 'gt:0'],
             'vendor_lot'      => ['required', 'string', 'max:100'],
             'production_date' => ['required', 'date'],
@@ -42,7 +42,6 @@ class PorcTransactionRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'trans_date.before_or_equal' => 'Tanggal transaksi tidak boleh melebihi hari ini.',
             'trans_qty.gt'               => 'Quantity harus lebih besar dari 0.',
             'vendor_lot.required'        => 'Vendor lot wajib diisi.',
             'production_date.required'   => 'Bulan produksi wajib diisi.',

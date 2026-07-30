@@ -56,9 +56,8 @@
                             <div class="form-group col-md-6">
                                 <label>Tanggal Masuk <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control @error('trans_date') is-invalid @enderror"
-                                    name="trans_date" value="{{ old('trans_date', now()->toDateString()) }}"
-                                    max="{{ now()->toDateString() }}" required>
-                                <small class="form-text text-muted">Bisa diisi mundur (backdate) jika telat input.</small>
+                                    name="trans_date" value="{{ old('trans_date', now()->toDateString()) }}" required>
+                                <small class="form-text text-muted">Bisa diisi tanggal apapun (mundur maupun maju).</small>
                                 @error('trans_date')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror

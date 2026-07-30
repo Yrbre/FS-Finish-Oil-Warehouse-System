@@ -179,13 +179,6 @@ class TransferRequestService implements TransferRequestServiceInterface
 
             $transDate = $effectiveDate ? Carbon::parse($effectiveDate) : now();
 
-            if ($request->approved_date && $transDate->lt($request->approved_date)) {
-                throw new \Exception(
-                    "Tanggal terima tidak boleh sebelum tanggal kirim (" .
-                        $request->approved_date->format('d-m-Y') . ")."
-                );
-            }
-
             $destWarehouseId = (int) $request->destination_warehouse_id;
 
             // Lot baru di gudang tujuan diperuntukan bagi department yang

@@ -17,7 +17,7 @@ class TransferRequestStoreRequest extends FormRequest
             'item_id'                  => ['required', 'exists:items,id'],
             'requested_qty'            => ['required', 'numeric', 'gt:0'],
             'destination_warehouse_id' => ['required', 'exists:warehouses,id'],
-            'expected_date'            => ['required', 'date', 'after_or_equal:today'],
+            'expected_date'            => ['required', 'date'],
             'notes'                    => ['nullable', 'string'],
         ];
     }
@@ -25,8 +25,7 @@ class TransferRequestStoreRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'requested_qty.gt'            => 'Jumlah harus lebih besar dari 0.',
-            'expected_date.after_or_equal' => 'Tanggal barang harus sampai tidak boleh sebelum hari ini.',
+            'requested_qty.gt' => 'Jumlah harus lebih besar dari 0.',
         ];
     }
 }

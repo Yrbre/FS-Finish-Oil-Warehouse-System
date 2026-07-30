@@ -43,7 +43,7 @@
                                     @foreach ($warehouses as $wh)
                                         <option value="{{ $wh->id }}"
                                             {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>
-                                            {{ $wh->name }} - {{ $wh->tag }}
+                                            {{ $wh->name }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -55,16 +55,15 @@
 
                         {{-- Info stok tersedia --}}
                         <div class="alert alert-info d-none" id="stockInfo">
-                            Stok tersedia: <strong id="stockValue" class="text-dark">0</strong> <span id="stockUom"></span>
+                            Stok tersedia: <strong id="stockValue">0</strong> <span id="stockUom"></span>
                         </div>
 
                         <div class="form-row">
                             <div class="form-group col-md-6">
                                 <label>Tanggal Pemakaian <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control @error('trans_date') is-invalid @enderror"
-                                    name="trans_date" value="{{ old('trans_date', now()->toDateString()) }}"
-                                    max="{{ now()->toDateString() }}" required>
-                                <small class="form-text text-muted">Bisa diisi mundur (backdate) jika telat input.</small>
+                                    name="trans_date" value="{{ old('trans_date', now()->toDateString()) }}" required>
+                                <small class="form-text text-muted">Bisa diisi tanggal apapun (mundur maupun maju).</small>
                                 @error('trans_date')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror

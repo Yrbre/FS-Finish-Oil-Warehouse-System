@@ -23,8 +23,7 @@
                                 <label>Item <span class="text-danger">*</span></label>
                                 <select class="form-control select2 @error('item_id') is-invalid @enderror" name="item_id"
                                     required>
-                                    <option value="">-- Pilih Item
-                                        --</option>
+                                    <option value="">-- Pilih Item --</option>
                                     @foreach ($items as $item)
                                         <option value="{{ $item->id }}"
                                             {{ old('item_id') == $item->id ? 'selected' : '' }}>
@@ -40,12 +39,12 @@
                             <div class="form-group col-md-6">
                                 <label>Gudang Tujuan <span class="text-danger">*</span></label>
                                 <select class="form-control select2 @error('destination_warehouse_id') is-invalid @enderror"
-                                    name="destination_warehouse_id" id="select2-destination-warehouse" required>
+                                    name="destination_warehouse_id" required>
                                     <option value="">-- Pilih Gudang --</option>
                                     @foreach ($warehouses as $wh)
                                         <option value="{{ $wh->id }}"
                                             {{ old('destination_warehouse_id') == $wh->id ? 'selected' : '' }}>
-                                            {{ $wh->name }} - {{ $wh->tag }}
+                                            {{ $wh->name }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -69,8 +68,7 @@
                             <div class="form-group col-md-6">
                                 <label>Tanggal Barang Harus Sampai <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control @error('expected_date') is-invalid @enderror"
-                                    name="expected_date" value="{{ old('expected_date') }}"
-                                    min="{{ now()->toDateString() }}" required>
+                                    name="expected_date" value="{{ old('expected_date') }}" required>
                                 @error('expected_date')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror

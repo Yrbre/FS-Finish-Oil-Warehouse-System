@@ -36,7 +36,7 @@
                     <div class="row">
                         <div class="col-md-3 mb-3">
                             <p class="small text-muted mb-1">Item</p>
-                            <strong>{{ $transferRequest->item->item_no }} / {{ $transferRequest->item->item_desc }}</strong>
+                            <strong>{{ $transferRequest->item->item_desc }}</strong>
                         </div>
                         <div class="col-md-2 mb-3">
                             <p class="small text-muted mb-1">Jumlah Diminta</p>
@@ -45,8 +45,7 @@
                         </div>
                         <div class="col-md-3 mb-3">
                             <p class="small text-muted mb-1">Gudang Tujuan</p>
-                            <strong>{{ $transferRequest->destinationWarehouse->name }} -
-                                {{ $transferRequest->destinationWarehouse->tag }}</strong>
+                            <strong>{{ $transferRequest->destinationWarehouse->name }}</strong>
                         </div>
                         <div class="col-md-2 mb-3">
                             <p class="small text-muted mb-1">Harus Sampai</p>
@@ -88,8 +87,7 @@
                                 <tbody>
                                     @forelse ($recommendation['allocation'] as $row)
                                         <tr>
-                                            <td>{{ $row['item_location']->warehouse->name }} -
-                                                {{ $row['item_location']->warehouse->tag }}</td>
+                                            <td>{{ $row['item_location']->warehouse->name }}</td>
                                             <td>{{ $row['item_location']->vendor_lot ?? '-' }}</td>
                                             <td>{{ $row['item_location']->exp_date?->format('d-m-Y') ?? '-' }}</td>
                                             <td class="text-right">{{ number_format($row['qty_to_take'], 2, ',', '.') }}
@@ -136,10 +134,8 @@
                                         method="POST" class="form-approve">
                                         @csrf
                                         <div class="form-group mb-2">
-                                            <label class="small text-muted">Tanggal Efektif Kirim (opsional, untuk
-                                                backdate)</label>
-                                            <input type="date" name="effective_date" class="form-control form-control-sm"
-                                                max="{{ now()->toDateString() }}">
+                                            <label class="small text-muted">Tanggal Efektif Kirim (opsional)</label>
+                                            <input type="date" name="effective_date" class="form-control form-control-sm">
                                         </div>
                                         <button type="submit" class="btn btn-success btn-approve">
                                             <span class="fe fe-check fe-16 mr-2"></span>Approve & Kirim
@@ -247,12 +243,9 @@
                                 <form action="{{ route('transfer-requests.receive', $transferRequest->id) }}" method="POST">
                                     @csrf
                                     <div class="form-group mb-2">
-                                        <label class="small text-muted">Tanggal Efektif Terima (opsional, untuk
-                                            backdate)</label>
+                                        <label class="small text-muted">Tanggal Efektif Terima (opsional)</label>
                                         <input type="date" name="effective_date" class="form-control form-control-sm"
-                                            style="max-width: 250px;"
-                                            min="{{ $transferRequest->approved_date?->toDateString() }}"
-                                            max="{{ now()->toDateString() }}">
+                                            style="max-width: 250px;">
                                     </div>
                                     <button type="submit" class="btn btn-success btn-receive">
                                         <span class="fe fe-check-circle fe-16 mr-2"></span>Konfirmasi Barang Sampai
