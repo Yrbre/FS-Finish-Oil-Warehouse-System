@@ -37,7 +37,7 @@
                         </div>
                     </div>
                 </div>
-                @can('approve-transfer')
+                @can('transfer-requests.approve')
                     <div class="col-md-3 mb-4">
                         <div class="card shadow {{ $pendingApproval > 0 ? 'border-warning' : '' }}">
                             <div class="card-body">
@@ -68,9 +68,9 @@
                     <div class="card shadow">
                         <div class="card-header">
                             <strong class="card-title">Transaksi Terbaru</strong>
-                            @can('create-transaction')
+                            @canany(['transactions.porc.view', 'transactions.cons.view', 'transactions.adj.view'])
                                 <a href="{{ route('transactions.index') }}" class="float-right small text-muted">Lihat semua</a>
-                            @endcan
+                            @endcanany
                         </div>
                         <div class="card-body p-0">
                             <table class="table table-striped mb-0">
@@ -106,7 +106,7 @@
                     <div class="card shadow">
                         <div class="card-header">
                             <strong class="card-title">Stok Mendekati Expired (30 hari)</strong>
-                            @can('view-reports')
+                            @can('reports.view')
                                 <a href="{{ route('reports.index') }}" class="float-right small text-muted">Lihat semua</a>
                             @endcan
                         </div>

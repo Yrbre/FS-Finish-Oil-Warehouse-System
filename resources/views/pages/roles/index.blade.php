@@ -9,9 +9,11 @@
                     <h2 class="h5 page-title">Role & Permission</h2>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('roles.create') }}" class="btn btn-primary btn-sm">
-                        <span class="fe fe-plus fe-16 mr-2"></span>Tambah Role
-                    </a>
+                    @can('roles.create')
+                        <a href="{{ route('roles.create') }}" class="btn btn-primary btn-sm">
+                            <span class="fe fe-plus fe-16 mr-2"></span>Tambah Role
+                        </a>
+                    @endcan
                 </div>
             </div>
 

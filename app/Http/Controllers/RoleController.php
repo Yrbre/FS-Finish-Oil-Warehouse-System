@@ -28,15 +28,23 @@ class RoleController extends Controller
                     ->addColumn('permissions_count', fn($row) => $row->permissions_count . ' permission')
                     ->addColumn('users_count', fn($row) => $row->users_count . ' user')
                     ->addColumn('action', function ($row) {
-                        $btns = '<a href="' . route('roles.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                        $btns = '';
 
-                        if (! in_array($row->name, self::PROTECTED_ROLES) && $row->users_count === 0) {
+                        if (auth()->user()->can('roles.update')) {
+                            $btns .= '<a href="' . route('roles.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                        }
+
+                        if (
+                            auth()->user()->can('roles.delete')
+                            && ! in_array($row->name, self::PROTECTED_ROLES)
+                            && $row->users_count === 0
+                        ) {
                             $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-delete"
                                 data-id="' . $row->id . '" data-name="' . e($row->name) . '"
                                 data-url="' . route('roles.destroy', $row->id) . '">Hapus</button>';
                         }
 
-                        return $btns;
+                        return $btns ?: '<span class="text-muted">-</span>';
                     })
                     ->rawColumns(['action'])
                     ->make(true);
@@ -131,32 +139,80 @@ class RoleController extends Controller
     }
 
     /**
-     * Kelompokkan permission supaya checkbox di form lebih rapi,
-     * bukan daftar datar 11 item.
+     * Kelompokkan permission per modul, dan di dalam tiap modul
+     * tampilkan checkbox terpisah untuk setiap aksi CRUD — tidak ada
+     * lagi 1 permission gabungan untuk create+update+delete.
      */
     private function groupedPermissions(): array
     {
         $labels = [
-            'manage-departments'      => 'Kelola Department',
-            'manage-warehouses'       => 'Kelola Gudang',
-            'manage-items'            => 'Kelola Item Master',
-            'manage-item-locations'   => 'Kelola Stok Gudang',
-            'create-transaction'      => 'Input Transaksi (PORC/CONS/ADJ)',
-            'manage-transfer-request' => 'Buat & Lihat Transfer Request',
-            'approve-transfer'        => 'Approve/Reject Transfer (IMC)',
-            'receive-transfer'        => 'Konfirmasi Terima Transfer',
-            'manage-users'            => 'Kelola User',
-            'manage-roles'            => 'Kelola Role & Permission',
-            'view-reports'            => 'Lihat Laporan',
+            'departments.view'   => 'Lihat Department',
+            'departments.create' => 'Tambah Department',
+            'departments.update' => 'Edit Department',
+            'departments.delete' => 'Hapus Department',
+
+            'warehouses.view'    => 'Lihat Gudang',
+            'warehouses.create'  => 'Tambah Gudang',
+            'warehouses.update'  => 'Edit Gudang',
+            'warehouses.delete'  => 'Hapus Gudang',
+
+            'items.view'   => 'Lihat Item & Kartu Stok',
+            'items.create' => 'Tambah Item',
+            'items.update' => 'Edit Item',
+            'items.delete' => 'Hapus Item',
+
+            'item-locations.view'   => 'Lihat Stok Gudang',
+            'item-locations.create' => 'Tambah Stok Gudang',
+            'item-locations.update' => 'Edit Stok Gudang',
+            'item-locations.delete' => 'Hapus Stok Gudang',
+
+            'transactions.porc.view'   => 'Lihat Transaksi Supply Oil (PORC)',
+            'transactions.porc.create' => 'Input Supply Oil (PORC)',
+            'transactions.porc.delete' => 'Hapus Transaksi Supply Oil (PORC)',
+            'transactions.cons.view'   => 'Lihat Transaksi Pemakaian (CONS)',
+            'transactions.cons.create' => 'Input Pemakaian (CONS)',
+            'transactions.adj.view'    => 'Lihat Transaksi Adjustment (ADJ)',
+            'transactions.adj.create'  => 'Input Adjustment (ADJ)',
+
+            'transfer-requests.view'     => 'Lihat Transfer Request',
+            'transfer-requests.create'   => 'Buat Transfer Request',
+            'transfer-requests.cancel'   => 'Batalkan Transfer Request Sendiri',
+            'transfer-requests.approve'  => 'Approve Transfer Request (IMC)',
+            'transfer-requests.reject'   => 'Reject Transfer Request (IMC)',
+            'transfer-requests.receive'  => 'Konfirmasi Terima Transfer',
+
+            'users.view'   => 'Lihat User',
+            'users.create' => 'Tambah User',
+            'users.update' => 'Edit User',
+            'users.delete' => 'Hapus User',
+
+            'roles.view'   => 'Lihat Role',
+            'roles.create' => 'Tambah Role',
+            'roles.update' => 'Edit Role',
+            'roles.delete' => 'Hapus Role',
+
+            'reports.view' => 'Lihat Laporan',
         ];
 
         $groups = [
-            'Master Data' => ['manage-departments', 'manage-warehouses', 'manage-items'],
-            'Inventory'   => ['manage-item-locations'],
-            'Transaksi'   => ['create-transaction'],
-            'Transfer'    => ['manage-transfer-request', 'approve-transfer', 'receive-transfer'],
-            'Laporan'     => ['view-reports'],
-            'User Management' => ['manage-users', 'manage-roles'],
+            'Department'       => ['departments.view', 'departments.create', 'departments.update', 'departments.delete'],
+            'Gudang'           => ['warehouses.view', 'warehouses.create', 'warehouses.update', 'warehouses.delete'],
+            'Item Master'      => ['items.view', 'items.create', 'items.update', 'items.delete'],
+            'Stok Gudang'      => ['item-locations.view', 'item-locations.create', 'item-locations.update', 'item-locations.delete'],
+            'Transaksi - Supply Oil (PORC)'  => ['transactions.porc.view', 'transactions.porc.create', 'transactions.porc.delete'],
+            'Transaksi - Pemakaian (CONS)'   => ['transactions.cons.view', 'transactions.cons.create'],
+            'Transaksi - Adjustment (ADJ)'   => ['transactions.adj.view', 'transactions.adj.create'],
+            'Transfer Request' => [
+                'transfer-requests.view',
+                'transfer-requests.create',
+                'transfer-requests.cancel',
+                'transfer-requests.approve',
+                'transfer-requests.reject',
+                'transfer-requests.receive',
+            ],
+            'User Management'  => ['users.view', 'users.create', 'users.update', 'users.delete'],
+            'Role Management'  => ['roles.view', 'roles.create', 'roles.update', 'roles.delete'],
+            'Laporan'          => ['reports.view'],
         ];
 
         $existingNames = Permission::pluck('name')->all();

@@ -9,9 +9,11 @@
                     <h2 class="h5 page-title">Master Gudang</h2>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('warehouses.create') }}" class="btn btn-primary btn-sm">
-                        <span class="fe fe-plus fe-16 mr-2"></span>Tambah Gudang
-                    </a>
+                    @can('warehouses.create')
+                        <a href="{{ route('warehouses.create') }}" class="btn btn-primary btn-sm">
+                            <span class="fe fe-plus fe-16 mr-2"></span>Tambah Gudang
+                        </a>
+                    @endcan
                 </div>
             </div>
 
@@ -38,7 +40,7 @@
                                     <tr>
                                         <th>No</th>
                                         <th>Nama Gudang</th>
-                                        <th>Tag</th>
+                                        <th>TAG</th>
                                         <th>Department</th>
                                         <th>Aksi</th>
                                     </tr>

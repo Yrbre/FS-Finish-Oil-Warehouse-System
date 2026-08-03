@@ -36,13 +36,20 @@ class WarehouseController extends Controller
                     ->addIndexColumn()
                     ->addColumn('department', fn($row) => $row->department->code . ' - ' . $row->department->name)
                     ->addColumn('action', function ($row) {
-                        return '
-                            <a href="' . route('warehouses.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>
-                            <button type="button" class="btn btn-sm btn-danger btn-delete"
+                        $btns = '';
+
+                        if (auth()->user()->can('warehouses.update')) {
+                            $btns .= '<a href="' . route('warehouses.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                        }
+
+                        if (auth()->user()->can('warehouses.delete')) {
+                            $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-delete"
                                 data-id="' . $row->id . '"
                                 data-name="' . e($row->name) . '"
-                                data-url="' . route('warehouses.destroy', $row->id) . '">Hapus</button>
-                        ';
+                                data-url="' . route('warehouses.destroy', $row->id) . '">Hapus</button>';
+                        }
+
+                        return $btns ?: '<span class="text-muted">-</span>';
                     })
                     ->rawColumns(['action'])
                     ->make(true);

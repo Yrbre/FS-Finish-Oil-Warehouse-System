@@ -8,7 +8,7 @@
                 <div class="col">
                     <h2 class="h5 page-title">Transfer Request</h2>
                 </div>
-                @can('manage-transfer-request')
+                @can('transfer-requests.create')
                     <div class="col-auto">
                         <a href="{{ route('transfer-requests.create') }}" class="btn btn-primary btn-sm">
                             <span class="fe fe-plus fe-16 mr-2"></span>Buat Request

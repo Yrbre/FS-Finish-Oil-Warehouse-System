@@ -35,15 +35,34 @@ class TransactionController extends Controller
     }
 
     /* =====================================================================
-     |  Daftar transaksi (gabungan semua jenis, bisa difilter)
+     |  Daftar transaksi (gabungan jenis yang user BOLEH lihat)
      ===================================================================== */
     public function index(Request $request)
     {
         try {
-            if ($request->ajax()) {
-                $transactions = $this->transactionService->getAll();
+            // Peta permission "view" → doc_type yang diwakilinya
+            $viewMap = [
+                'transactions.porc.view' => Transaction::DOC_PORC,
+                'transactions.cons.view' => Transaction::DOC_CONS,
+                'transactions.adj.view'  => Transaction::DOC_ADJ,
+            ];
 
-                if ($request->doc_type) {
+            $allowedDocTypes = collect($viewMap)
+                ->filter(fn($docType, $permission) => auth()->user()->can($permission))
+                ->values()
+                ->all();
+
+            if (empty($allowedDocTypes)) {
+                abort(403);
+            }
+
+            if ($request->ajax()) {
+                $transactions = $this->transactionService->getAll()
+                    ->whereIn('doc_type', $allowedDocTypes);
+
+                // Kalau user filter jenis tertentu, pastikan jenis itu tetap
+                // dalam batas yang dia boleh lihat (cegah bypass lewat query string)
+                if ($request->doc_type && in_array($request->doc_type, $allowedDocTypes)) {
                     $transactions->where('doc_type', $request->doc_type);
                 }
                 if ($request->warehouse_id) {
@@ -63,8 +82,8 @@ class TransactionController extends Controller
                     ->addColumn('out_qty', fn($row) => (float) $row->out_qty > 0 ? number_format((float) $row->out_qty, 2, ',', '.') : '-')
                     ->addColumn('created_by', fn($row) => $row->creator->name ?? '-')
                     ->addColumn('action', function ($row) {
-                        // Hanya PORC yang bisa dihapus (CONS/ADJ dikoreksi lewat ADJ baru)
-                        if ($row->doc_type !== Transaction::DOC_PORC) {
+                        // Hanya PORC yang bisa dihapus, dan hanya untuk yang punya permission-nya
+                        if ($row->doc_type !== Transaction::DOC_PORC || ! auth()->user()->can('transactions.porc.delete')) {
                             return '<span class="text-muted">-</span>';
                         }
                         return '<button type="button" class="btn btn-sm btn-danger btn-delete"
@@ -77,7 +96,7 @@ class TransactionController extends Controller
 
             $warehouses = $this->warehouseService->getAll()->get();
 
-            return view('pages.transactions.index', compact('warehouses'));
+            return view('pages.transactions.index', compact('warehouses', 'allowedDocTypes'));
         } catch (\Exception $e) {
             Log::error('Gagal menampilkan transaksi: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Data transaksi tidak dapat ditampilkan.');
@@ -90,11 +109,7 @@ class TransactionController extends Controller
     public function createPorc()
     {
         $items      = $this->itemService->getAll()->get();
-        if (auth()->user()->role === 'admin') {
-            $warehouses = $this->warehouseService->getAll()->get();
-        } else {
-            $warehouses = $this->warehouseService->getByDepartment(auth()->user()->department_id);
-        }
+        $warehouses = $this->warehouseService->getAll()->get();
 
         return view('pages.transactions.porc', compact('items', 'warehouses'));
     }
@@ -121,7 +136,7 @@ class TransactionController extends Controller
     public function createCons()
     {
         $items      = $this->itemService->getAll()->get();
-        if (auth()->user()->role === 'admin') {
+        if (auth()->user()->hasRole('admin')) {
             $warehouses = $this->warehouseService->getAll()->get();
         } else {
             $warehouses = $this->warehouseService->getByDepartment(auth()->user()->department_id);

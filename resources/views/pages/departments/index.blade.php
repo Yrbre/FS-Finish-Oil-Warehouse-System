@@ -1,4 +1,5 @@
 @extends('layouts.template')
+
 @section('content')
     <div class="row justify-content-center">
         <div class="col-12">
@@ -8,9 +9,11 @@
                     <h2 class="h5 page-title">Master Department</h2>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('departments.create') }}" class="btn btn-primary btn-sm">
-                        <span class="fe fe-plus fe-16 mr-2"></span>Tambah Department
-                    </a>
+                    @can('departments.create')
+                        <a href="{{ route('departments.create') }}" class="btn btn-primary btn-sm">
+                            <span class="fe fe-plus fe-16 mr-2"></span>Tambah Department
+                        </a>
+                    @endcan
                 </div>
             </div>
 

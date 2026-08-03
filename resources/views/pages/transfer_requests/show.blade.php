@@ -87,7 +87,8 @@
                                 <tbody>
                                     @forelse ($recommendation['allocation'] as $row)
                                         <tr>
-                                            <td>{{ $row['item_location']->warehouse->name }}</td>
+                                            <td>{{ $row['item_location']->warehouse->name }} -
+                                                {{ $row['item_location']->warehouse->tag }}</td>
                                             <td>{{ $row['item_location']->vendor_lot ?? '-' }}</td>
                                             <td>{{ $row['item_location']->exp_date?->format('d-m-Y') ?? '-' }}</td>
                                             <td class="text-right">{{ number_format($row['qty_to_take'], 2, ',', '.') }}
@@ -128,7 +129,7 @@
                     <div class="card-body">
                         <div class="d-flex flex-wrap" style="gap: 0.5rem;">
 
-                            @can('approve-transfer')
+                            @can('transfer-requests.approve')
                                 @if ($recommendation['is_fulfilled'])
                                     <form action="{{ route('transfer-requests.approve', $transferRequest->id) }}"
                                         method="POST" class="form-approve">
@@ -142,7 +143,9 @@
                                         </button>
                                     </form>
                                 @endif
+                            @endcan
 
+                            @can('transfer-requests.reject')
                                 <button type="button" class="btn btn-danger btn-reject ml-2" data-toggle="modal"
                                     data-target="#rejectModal">
                                     <span class="fe fe-x fe-16 mr-2"></span>Reject
@@ -164,7 +167,7 @@
                 </div>
 
                 {{-- Modal reject --}}
-                @can('approve-transfer')
+                @can('transfer-requests.reject')
                     <div class="modal fade" id="rejectModal" tabindex="-1" role="dialog">
                         <div class="modal-dialog" role="document">
                             <div class="modal-content">
@@ -237,7 +240,7 @@
                 </div>
 
                 @if ($transferRequest->status === 'in_transit')
-                    @can('receive-transfer')
+                    @can('transfer-requests.receive')
                         <div class="card shadow mb-4">
                             <div class="card-body">
                                 <form action="{{ route('transfer-requests.receive', $transferRequest->id) }}" method="POST">

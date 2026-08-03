@@ -65,11 +65,17 @@
                                 </select>
                             </div>
                         @else
-                            <div class="col-md-5">
-                                <label class="small text-muted">Scope</label>
-                                <p class="form-control-plaintext">
-                                    <span class="">Gudang department Anda</span><br>
-                                </p>
+                            <div class="col-md-3">
+                                <label for="warehouse_id" class="small text-muted">Gudang (Department Anda)</label>
+                                <select name="warehouse_id" id="warehouse_id" class="form-control select2">
+                                    <option value="">Semua gudang di department saya</option>
+                                    @foreach ($warehouses as $wh)
+                                        <option value="{{ $wh->id }}"
+                                            {{ $warehouseId == $wh->id ? 'selected' : '' }}>
+                                            {{ $wh->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
                         @endif
 

@@ -40,7 +40,7 @@ class TransferRequestController extends Controller
                 }
 
                 // Non-approver hanya lihat request miliknya sendiri
-                if (! auth()->user()->can('approve-transfer')) {
+                if (! auth()->user()->can('transfer-requests.approve')) {
                     $transferRequests->where('requested_by', auth()->id());
                 }
 
@@ -69,12 +69,12 @@ class TransferRequestController extends Controller
     public function create()
     {
         $items      = $this->itemService->getAll()->get();
-
-        if (auth()->user()->role === 'admin') {
+        if (auth()->user()->hasRole('admin')) {
             $warehouses = $this->warehouseService->getAll()->get();
         } else {
             $warehouses = $this->warehouseService->getByDepartment(auth()->user()->department_id);
         }
+
 
         return view('pages.transfer_requests.create', compact('items', 'warehouses'));
     }

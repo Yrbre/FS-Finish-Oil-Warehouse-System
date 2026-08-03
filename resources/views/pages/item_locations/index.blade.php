@@ -8,13 +8,13 @@
                 <div class="col">
                     <h2 class="h5 page-title">Stok Gudang (Item Onhand)</h2>
                 </div>
-                @hasrole('admin')
-                    <div class="col-auto">
+                <div class="col-auto">
+                    @can('item-locations.create')
                         <a href="{{ route('item-locations.create') }}" class="btn btn-primary btn-sm">
                             <span class="fe fe-plus fe-16 mr-2"></span>Tambah Stok
                         </a>
-                    </div>
-                @endhasrole
+                    @endcan
+                </div>
             </div>
 
             <div class="row my-4">
@@ -38,8 +38,7 @@
                                     <select id="filterWarehouse" class="form-control select2">
                                         <option value="">Semua Gudang</option>
                                         @foreach ($warehouses as $wh)
-                                            <option value="{{ $wh->id }}">{{ $wh->name }} - {{ $wh->tag }}
-                                            </option>
+                                            <option value="{{ $wh->id }}">{{ $wh->name }}</option>
                                         @endforeach
                                     </select>
                                 </div>

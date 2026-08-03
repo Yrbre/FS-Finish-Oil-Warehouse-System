@@ -57,17 +57,13 @@ class ItemLocationController extends Controller
                     ->addColumn('exp_date', fn($row) => $row->exp_date ? $row->exp_date->format('d-m-Y') : '-')
                     ->addColumn('qty_weight', fn($row) => number_format((float) $row->qty_weight, 2, ',', '.') . ' ' . $row->item->item_uom)
                     ->addColumn('action', function ($row) {
-                        $button = '';
-                        if (auth()->user()->hasAnyRole(['admin'])) {
-                            $button = '
-                                <a href="' . route('item-locations.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>
-                                <button type="button" class="btn btn-sm btn-danger btn-delete"
-                                    data-id="' . $row->id . '"
-                                    data-name="' . e($row->vendor_lot ?? $row->item->item_desc) . '"
-                                    data-url="' . route('item-locations.destroy', $row->id) . '">Hapus</button>
-                            ';
-                        }
-                        return $button;
+                        return '
+                            <a href="' . route('item-locations.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>
+                            <button type="button" class="btn btn-sm btn-danger btn-delete"
+                                data-id="' . $row->id . '"
+                                data-name="' . e($row->vendor_lot ?? $row->item->item_desc) . '"
+                                data-url="' . route('item-locations.destroy', $row->id) . '">Hapus</button>
+                        ';
                     })
                     ->rawColumns(['action'])
                     ->make(true);
@@ -89,6 +85,7 @@ class ItemLocationController extends Controller
         $items      = $this->itemService->getAll()->get();
         $warehouses = $this->warehouseService->getAll()->get();
         $departments = $this->departmentService->getAll()->get();
+
 
         return view('pages.item_locations.create', compact('items', 'warehouses', 'departments'));
     }

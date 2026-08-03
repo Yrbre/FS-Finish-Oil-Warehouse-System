@@ -9,9 +9,11 @@
                     <h2 class="h5 page-title">Manajemen User</h2>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('users.create') }}" class="btn btn-primary btn-sm">
-                        <span class="fe fe-plus fe-16 mr-2"></span>Tambah User
-                    </a>
+                    @can('users.create')
+                        <a href="{{ route('users.create') }}" class="btn btn-primary btn-sm">
+                            <span class="fe fe-plus fe-16 mr-2"></span>Tambah User
+                        </a>
+                    @endcan
                 </div>
             </div>
 

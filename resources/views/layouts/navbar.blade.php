@@ -25,78 +25,82 @@
                 </li>
 
                 {{-- Master Data — tampil kalau user punya salah satu permission master --}}
-                @canany(['manage-departments', 'manage-warehouses', 'manage-users', 'manage-warehouses'])
+                @canany(['departments.view', 'warehouses.view', 'users.view'])
                     <li class="nav-item dropdown">
                         <a href="#" id="masterDropdown" class="dropdown-toggle nav-link" role="button"
                             data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                             <span class="ml-lg-2">Master</span>
                         </a>
                         <div class="dropdown-menu" aria-labelledby="masterDropdown">
-                            @can('manage-departments')
+                            @can('departments.view')
                                 <a class="nav-link pl-lg-2" href="{{ route('departments.index') }}"><span
                                         class="ml-1">Department</span></a>
                             @endcan
-                            @can('manage-warehouses')
+                            @can('warehouses.view')
                                 <a class="nav-link pl-lg-2" href="{{ route('warehouses.index') }}"><span
                                         class="ml-1">Warehouses</span></a>
                             @endcan
-                            @can('manage-users')
+                            @can('users.view')
                                 <a class="nav-link pl-lg-2" href="{{ route('users.index') }}"><span
                                         class="ml-1">Users</span></a>
+                            @endcan
+                            @can('roles.view')
+                                <a class="nav-link pl-lg-2" href="{{ route('roles.index') }}"><span
+                                        class="ml-1">Roles</span></a>
                             @endcan
                         </div>
                     </li>
                 @endcanany
 
-                {{-- Item Oil: admin/IMC (kelola master) ATAU staff (lihat kartu stok saja) --}}
-                @canany(['manage-items', 'create-transaction'])
+                @can('items.view')
                     <li class="nav-item">
                         <a class="nav-link" href="{{ route('items.index') }}">
                             <span class="ml-lg-2">Item Oil</span>
                         </a>
                     </li>
-                @endcanany
+                @endcan
 
                 {{-- Transaksi --}}
-                @canany(['create-transaction', 'manage-transfer-request', 'approve-transfer'])
+                @canany(['transactions.porc.view', 'transactions.cons.view', 'transactions.adj.view',
+                    'transfer-requests.view'])
                     <li class="nav-item dropdown">
                         <a class="dropdown-toggle nav-link pl-lg-3" href="#" id="transaksiDropdown" role="button"
                             data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                             Transaksi
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="transaksiDropdown">
-                            @can('create-transaction')
+                            @canany(['transactions.porc.view', 'transactions.cons.view', 'transactions.adj.view'])
                                 <li>
                                     <a class="nav-link pl-lg-2" href="{{ route('transactions.index') }}"><span
                                             class="ml-1">Supply Oil</span></a>
                                 </li>
-                            @endcan
-                            @canany(['manage-transfer-request', 'approve-transfer'])
+                            @endcanany
+                            @can('transfer-requests.view')
                                 <li>
                                     <a class="nav-link pl-lg-2" href="{{ route('transfer-requests.index') }}"><span
                                             class="ml-1">Transfer Request</span></a>
                                 </li>
-                            @endcanany
+                            @endcan
                         </ul>
                     </li>
                 @endcanany
 
                 {{-- Inventory --}}
-                @can('manage-item-locations')
+                @can('item-locations.view')
                     <li class="nav-item dropdown">
                         <a href="#" id="inventoryDropdown" class="dropdown-toggle nav-link" role="button"
                             data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                             <span class="ml-lg-2">Inventory</span>
                         </a>
                         <div class="dropdown-menu" aria-labelledby="inventoryDropdown">
-                            <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span class="ml-1">Item
-                                    Onhand</span></a>
+                            <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span
+                                    class="ml-1">Item Onhand</span></a>
                         </div>
                     </li>
                 @endcan
 
                 {{-- Laporan --}}
-                @can('view-reports')
+                @can('reports.view')
                     <li class="nav-item">
                         <a href="{{ route('reports.index') }}"
                             class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">Laporan</a>

@@ -27,13 +27,20 @@ class DepartmentController extends Controller
                     ->addIndexColumn()
                     ->addColumn('warehouse_count', fn($row) => $row->warehouses()->count())
                     ->addColumn('action', function ($row) {
-                        return '
-                            <a href="' . route('departments.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>
-                            <button type="button" class="btn btn-sm btn-danger btn-delete"
+                        $btns = '';
+
+                        if (auth()->user()->can('departments.update')) {
+                            $btns .= '<a href="' . route('departments.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                        }
+
+                        if (auth()->user()->can('departments.delete')) {
+                            $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-delete"
                                 data-id="' . $row->id . '"
                                 data-name="' . e($row->name) . '"
-                                data-url="' . route('departments.destroy', $row->id) . '">Hapus</button>
-                        ';
+                                data-url="' . route('departments.destroy', $row->id) . '">Hapus</button>';
+                        }
+
+                        return $btns ?: '<span class="text-muted">-</span>';
                     })
                     ->rawColumns(['action'])
                     ->make(true);

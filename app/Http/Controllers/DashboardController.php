@@ -40,7 +40,7 @@ class DashboardController extends Controller
         ];
 
         // Widget khusus approver: berapa request menunggu approval
-        $pendingApproval = auth()->user()->can('approve-transfer')
+        $pendingApproval = auth()->user()->can('transfer-requests.approve')
             ? $this->transferRequestService->getAll()->where('status', TransferRequest::STATUS_NEW)->count()
             : 0;
 

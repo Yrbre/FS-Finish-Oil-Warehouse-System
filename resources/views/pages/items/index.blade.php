@@ -9,9 +9,11 @@
                     <h2 class="h5 page-title">Master Item Oil</h2>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('items.create') }}" class="btn btn-primary btn-sm">
-                        <span class="fe fe-plus fe-16 mr-2"></span>Tambah Item
-                    </a>
+                    @can('items.create')
+                        <a href="{{ route('items.create') }}" class="btn btn-primary btn-sm">
+                            <span class="fe fe-plus fe-16 mr-2"></span>Tambah Item
+                        </a>
+                    @endcan
                 </div>
             </div>
 
@@ -25,7 +27,6 @@
                                         <th>No</th>
                                         <th>Kode Item</th>
                                         <th>Nama Item</th>
-                                        <th>GL CLASS</th>
                                         <th>Satuan</th>
                                         <th>Total Stok</th>
                                         <th>Aksi</th>
@@ -62,10 +63,6 @@
                     {
                         data: 'item_desc',
                         name: 'item_desc'
-                    },
-                    {
-                        data: 'item_glclass',
-                        name: 'item_glclass'
                     },
                     {
                         data: 'item_uom',

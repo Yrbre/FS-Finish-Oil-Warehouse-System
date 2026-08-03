@@ -37,16 +37,19 @@ class UserController extends Controller
                         ? '<span class="badge badge-success">IMC Approver</span>'
                         : '-')
                     ->addColumn('action', function ($row) {
-                        $btns = '<a href="' . route('users.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                        $btns = '';
 
-                        // Cegah admin menghapus akunnya sendiri
-                        if ($row->id !== auth()->id()) {
+                        if (auth()->user()->can('users.update')) {
+                            $btns .= '<a href="' . route('users.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                        }
+
+                        if (auth()->user()->can('users.delete') && $row->id !== auth()->id()) {
                             $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-delete"
                                 data-id="' . $row->id . '" data-name="' . e($row->name) . '"
                                 data-url="' . route('users.destroy', $row->id) . '">Hapus</button>';
                         }
 
-                        return $btns;
+                        return $btns ?: '<span class="text-muted">-</span>';
                     })
                     ->rawColumns(['is_approver', 'action'])
                     ->make(true);

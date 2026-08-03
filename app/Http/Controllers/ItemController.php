@@ -37,6 +37,9 @@ class ItemController extends Controller
     public function index(Request $request)
     {
         try {
+            // Route sudah dijaga middleware can:items.view, tapi tombol
+            // Edit/Hapus di kolom action tetap perlu dicek permission
+            // spesifiknya masing-masing.
             if ($request->ajax()) {
                 $items = $this->itemService->getAll();
 
@@ -48,14 +51,20 @@ class ItemController extends Controller
                         return number_format($stock, 2, ',', '.') . ' ' . $row->item_uom;
                     })
                     ->addColumn('action', function ($row) {
-                        return '
-                            <a href="' . route('items.detail', $row->id) . '" class="btn btn-sm btn-info">Kartu Stok</a>
-                            <a href="' . route('items.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>
-                            <button type="button" class="btn btn-sm btn-danger btn-delete"
+                        $btns = '<a href="' . route('items.detail', $row->id) . '" class="btn btn-sm btn-info">Kartu Stok</a>';
+
+                        if (auth()->user()->can('items.update')) {
+                            $btns .= ' <a href="' . route('items.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                        }
+
+                        if (auth()->user()->can('items.delete')) {
+                            $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-delete"
                                 data-id="' . $row->id . '"
                                 data-name="' . e($row->item_desc) . '"
-                                data-url="' . route('items.destroy', $row->id) . '">Hapus</button>
-                        ';
+                                data-url="' . route('items.destroy', $row->id) . '">Hapus</button>';
+                        }
+
+                        return $btns;
                     })
                     ->rawColumns(['action'])
                     ->make(true);
@@ -141,15 +150,15 @@ class ItemController extends Controller
     public function detail(string $id, Request $request)
     {
         try {
-            if (! auth()->user()->canAny(['manage-items', 'create-transaction'])) {
-                abort(403);
-            }
-
             $month = (int) $request->get('month', now()->month);
             $year  = (int) $request->get('year', now()->year);
             $item  = $this->itemService->getById((int) $id);
 
-            $isFullAccess = auth()->user()->can('manage-items');
+            // Penanda "akses penuh" (admin/IMC, bisa lihat semua department)
+            // dipakai item-locations.view, karena hanya role yang benar-benar
+            // mengelola gudang secara luas yang punya permission ini —
+            // staff tidak pernah diberi item-locations.view.
+            $isFullAccess = auth()->user()->can('item-locations.view');
 
             if ($isFullAccess) {
                 $departments = $this->departmentService->getAll()->get();
@@ -176,20 +185,33 @@ class ItemController extends Controller
                     $warehouseIds
                 );
             } else {
-                // Staff: paksa scope ke department dia sendiri, tidak ada
-                // pilihan lain, dan pakai kalkulasi Transfer-in/CONS/ADJ saja.
-                $departments  = collect();
-                $warehouses   = collect();
+                // Staff: department terkunci ke department dia sendiri,
+                // tapi warehouse di dalamnya boleh dipilih bebas.
                 $departmentId = auth()->user()->department_id;
-                $warehouseId  = null;
 
-                $warehouseIds = $departmentId
-                    ? $this->warehouseService->getByDepartment((int) $departmentId)->pluck('id')->all()
-                    : [];
+                $departmentWarehouses = $departmentId
+                    ? $this->warehouseService->getByDepartment((int) $departmentId)
+                    : collect();
 
-                if (empty($warehouseIds)) {
+                if ($departmentWarehouses->isEmpty()) {
                     throw new \Exception("Anda belum terdaftar di department manapun yang memiliki gudang.");
                 }
+
+                $warehouseId = $request->get('warehouse_id');
+
+                // Validasi: gudang yang dipilih harus milik department staff
+                // sendiri — cegah staff mengetik warehouse_id department lain
+                // langsung lewat URL.
+                if ($warehouseId && ! $departmentWarehouses->contains('id', (int) $warehouseId)) {
+                    throw new \Exception("Gudang yang dipilih bukan milik department Anda.");
+                }
+
+                $warehouseIds = $warehouseId
+                    ? [(int) $warehouseId]
+                    : $departmentWarehouses->pluck('id')->all();
+
+                $departments = collect(); // staff tidak perlu pilih department
+                $warehouses  = $departmentWarehouses; // untuk dropdown, sudah ter-scope
 
                 $stockCard = $this->stockLedgerService->getStaffMonthlyStockCard(
                     (int) $id,
