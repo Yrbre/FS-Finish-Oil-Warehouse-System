@@ -100,12 +100,18 @@ class TransferRequestController extends Controller
         try {
             $transferRequest = $this->transferRequestService->getById((int) $id);
 
-            // Rekomendasi FEFO hanya relevan & dihitung saat masih status "new"
-            $recommendation = $transferRequest->status === TransferRequest::STATUS_NEW
-                ? $this->transferRequestService->getRecommendation((int) $id)
-                : null;
+            $recommendation = null;
+            $availableLots  = null;
 
-            return view('pages.transfer_requests.show', compact('transferRequest', 'recommendation'));
+            if ($transferRequest->status === TransferRequest::STATUS_NEW) {
+                // Tetap dihitung untuk info ringkas (total & status cukup/tidak)
+                $recommendation = $this->transferRequestService->getRecommendation((int) $id);
+
+                // Daftar LENGKAP lot yang bisa dipilih manual, dengan saran FEFO
+                $availableLots = $this->transferRequestService->getAvailableLots((int) $id);
+            }
+
+            return view('pages.transfer_requests.show', compact('transferRequest', 'recommendation', 'availableLots'));
         } catch (\Exception $e) {
             Log::error('Gagal menampilkan detail transfer request: ' . $e->getMessage());
             return redirect()->route('transfer-requests.index')->with('error', 'Transfer request tidak ditemukan.');
@@ -115,10 +121,22 @@ class TransferRequestController extends Controller
     public function approve(Request $request, string $id)
     {
         try {
+            // allocation[] dikirim dari form: item_location_id => qty.
+            // Kalau approver tidak ubah apapun, nilainya = saran FEFO
+            // (sudah di-pre-fill di view) — jadi hasilnya sama saja
+            // seperti auto-approve, tapi tetap lewat jalur validasi manual.
+            $manualAllocation = $request->filled('allocation')
+                ? collect($request->input('allocation'))
+                ->map(fn($qty) => (float) $qty)
+                ->filter(fn($qty) => $qty > 0)
+                ->toArray()
+                : null;
+
             $transferRequest = $this->transferRequestService->approve(
                 (int) $id,
                 auth()->id(),
-                $request->input('effective_date')
+                $request->input('effective_date'),
+                $manualAllocation
             );
 
             return redirect()->route('transfer-requests.show', $id)

@@ -67,104 +67,113 @@
                 </div>
             </div>
 
-            {{-- Status: NEW — rekomendasi FEFO + approve/reject/cancel --}}
+            {{-- Status: NEW — form alokasi (pre-filled FEFO, bisa diedit manual) --}}
             @if ($transferRequest->status === 'new')
-                <div class="card shadow mb-4">
-                    <div class="card-header">
-                        <strong class="card-title">Rekomendasi Alokasi (FEFO Lintas Gudang)</strong>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-bordered mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Gudang Asal</th>
-                                        <th>Vendor Lot</th>
-                                        <th>Exp Date</th>
-                                        <th class="text-right">Diambil</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse ($recommendation['allocation'] as $row)
-                                        <tr>
-                                            <td>{{ $row['item_location']->warehouse->name }} -
-                                                {{ $row['item_location']->warehouse->tag }}</td>
-                                            <td>{{ $row['item_location']->vendor_lot ?? '-' }}</td>
-                                            <td>{{ $row['item_location']->exp_date?->format('d-m-Y') ?? '-' }}</td>
-                                            <td class="text-right">{{ number_format($row['qty_to_take'], 2, ',', '.') }}
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="4" class="text-center text-muted py-3">Tidak ada stok tersedia
-                                                di gudang manapun.</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                                <tfoot>
-                                    <tr class="font-weight-bold">
-                                        <td colspan="3" class="text-right">Total Teralokasi</td>
-                                        <td class="text-right">
-                                            {{ number_format(collect($recommendation['allocation'])->sum('qty_to_take'), 2, ',', '.') }}
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-                    @if ($recommendation['is_fulfilled'])
-                        <div class="card-footer bg-success text-white">
-                            <span class="fe fe-check-circle fe-16 mr-2"></span>Stok mencukupi, siap di-approve.
-                        </div>
-                    @else
-                        <div class="card-footer bg-danger text-white">
-                            <span class="fe fe-alert-triangle fe-16 mr-2"></span>
-                            Stok tidak mencukupi di seluruh gudang. Kurang:
-                            {{ number_format($recommendation['remaining_qty'], 2, ',', '.') }}
-                        </div>
-                    @endif
-                </div>
+                <form action="{{ route('transfer-requests.approve', $transferRequest->id) }}" method="POST"
+                    id="approveForm">
+                    @csrf
 
-                <div class="card shadow mb-4">
-                    <div class="card-body">
-                        <div class="d-flex flex-wrap" style="gap: 0.5rem;">
+                    <div class="card shadow mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong class="card-title">Pilih Lot & Qty yang Dikirim</strong>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnResetFefo">
+                                <span class="fe fe-refresh-cw fe-14 mr-1"></span>Isi Ulang Saran FEFO
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-bordered mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Gudang Asal</th>
+                                            <th>Vendor Lot</th>
+                                            <th>Exp Date</th>
+                                            <th class="text-right">Stok Tersedia</th>
+                                            <th class="text-right" style="width: 160px;">Qty Diambil</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($availableLots['lots'] as $lot)
+                                            @php $suggested = $availableLots['suggestions'][$lot->id] ?? 0; @endphp
+                                            <tr>
+                                                <td>{{ $lot->warehouse->name }}</td>
+                                                <td>{{ $lot->vendor_lot ?? '-' }}</td>
+                                                <td>{{ $lot->exp_date?->format('d-m-Y') ?? '-' }}</td>
+                                                <td class="text-right">
+                                                    {{ number_format((float) $lot->qty_weight, 2, ',', '.') }}</td>
+                                                <td>
+                                                    <input type="number" step="0.01" min="0"
+                                                        max="{{ $lot->qty_weight }}"
+                                                        name="allocation[{{ $lot->id }}]"
+                                                        class="form-control form-control-sm text-right allocation-input"
+                                                        value="{{ old('allocation.' . $lot->id, $suggested) }}"
+                                                        data-suggested="{{ $suggested }}"
+                                                        data-max="{{ $lot->qty_weight }}">
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted py-3">Tidak ada stok
+                                                    tersedia di gudang IMC.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="font-weight-bold">
+                                            <td colspan="4" class="text-right">Total Diambil</td>
+                                            <td class="text-right" id="allocationTotal">0,00</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card-footer" id="allocationStatus">
+                            {{-- diisi JS --}}
+                        </div>
+                    </div>
 
-                            @can('transfer-requests.approve')
-                                @if ($recommendation['is_fulfilled'])
-                                    <form action="{{ route('transfer-requests.approve', $transferRequest->id) }}"
-                                        method="POST" class="form-approve">
-                                        @csrf
+                    <div class="card shadow mb-4">
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap align-items-end" style="gap: 0.5rem;">
+
+                                @can('transfer-requests.approve')
+                                    <div>
                                         <div class="form-group mb-2">
                                             <label class="small text-muted">Tanggal Efektif Kirim (opsional)</label>
                                             <input type="date" name="effective_date" class="form-control form-control-sm">
                                         </div>
-                                        <button type="submit" class="btn btn-success btn-approve">
+                                        <button type="submit" class="btn btn-success btn-approve" id="btnApprove">
                                             <span class="fe fe-check fe-16 mr-2"></span>Approve & Kirim
                                         </button>
-                                    </form>
-                                @endif
-                            @endcan
+                                    </div>
+                                @endcan
 
-                            @can('transfer-requests.reject')
-                                <button type="button" class="btn btn-danger btn-reject ml-2" data-toggle="modal"
-                                    data-target="#rejectModal">
-                                    <span class="fe fe-x fe-16 mr-2"></span>Reject
-                                </button>
-                            @endcan
-
-                            @if ($transferRequest->requested_by === auth()->id() && $transferRequest->isCancellable())
-                                <form action="{{ route('transfer-requests.cancel', $transferRequest->id) }}" method="POST"
-                                    class="form-cancel ml-2">
-                                    @csrf
-                                    <button type="submit" class="btn btn-outline-secondary">
-                                        <span class="fe fe-slash fe-16 mr-2"></span>Batalkan Request
+                                @can('transfer-requests.reject')
+                                    <button type="button" class="btn btn-danger btn-reject ml-2" data-toggle="modal"
+                                        data-target="#rejectModal">
+                                        <span class="fe fe-x fe-16 mr-2"></span>Reject
                                     </button>
-                                </form>
-                            @endif
+                                @endcan
 
+                                @if ($transferRequest->requested_by === auth()->id() && $transferRequest->isCancellable())
+                                    <div class="ml-2">
+                                        <button type="submit" form="cancelForm" class="btn btn-outline-secondary">
+                                            <span class="fe fe-slash fe-16 mr-2"></span>Batalkan Request
+                                        </button>
+                                    </div>
+                                @endif
+
+                            </div>
                         </div>
                     </div>
-                </div>
+                </form>
+
+                @if ($transferRequest->requested_by === auth()->id() && $transferRequest->isCancellable())
+                    <form action="{{ route('transfer-requests.cancel', $transferRequest->id) }}" method="POST"
+                        id="cancelForm" class="form-cancel d-none">
+                        @csrf
+                    </form>
+                @endif
 
                 {{-- Modal reject --}}
                 @can('transfer-requests.reject')
@@ -175,7 +184,8 @@
                                     @csrf
                                     <div class="modal-header">
                                         <h5 class="modal-title">Tolak Transfer Request</h5>
-                                        <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                                        <button type="button" class="close"
+                                            data-dismiss="modal"><span>&times;</span></button>
                                     </div>
                                     <div class="modal-body">
                                         <div class="form-group">
@@ -290,30 +300,103 @@
 
 @push('scripts')
     <script>
-        // Konfirmasi sebelum submit aksi-aksi penting
-        function confirmSubmit(form, title, text, confirmText, color) {
-            $(form).on('submit', function(e) {
-                e.preventDefault();
-                const target = this;
+        // Hitung total qty yang diambil secara live, dan validasi sebelum submit
+        function updateAllocationSummary() {
+            const requestedQty = {{ (float) $transferRequest->requested_qty }};
+            let total = 0;
 
-                Swal.fire({
-                    title: title,
-                    text: text,
-                    icon: 'warning',
-                    theme: 'dark',
-                    showCancelButton: true,
-                    confirmButtonText: confirmText,
-                    cancelButtonText: 'Batal',
-                    confirmButtonColor: color,
-                    reverseButtons: true,
-                }).then((result) => {
-                    if (result.isConfirmed) target.submit();
+            document.querySelectorAll('.allocation-input').forEach(function(input) {
+                const val = parseFloat(input.value) || 0;
+                const max = parseFloat(input.dataset.max) || 0;
+
+                // Cegah user mengetik lebih dari stok tersedia di lot itu
+                if (val > max) {
+                    input.value = max;
+                    total += max;
+                } else {
+                    total += val;
+                }
+            });
+
+            const totalEl = document.getElementById('allocationTotal');
+            const statusEl = document.getElementById('allocationStatus');
+            const btnApprove = document.getElementById('btnApprove');
+
+            if (totalEl) {
+                totalEl.textContent = total.toLocaleString('id-ID', {
+                    minimumFractionDigits: 2
+                });
+            }
+
+            if (statusEl) {
+                const diff = Math.round((total - requestedQty) * 100) / 100;
+
+                if (diff === 0) {
+                    statusEl.className = 'card-footer bg-success text-white';
+                    statusEl.innerHTML =
+                        '<span class="fe fe-check-circle fe-16 mr-2"></span>Total sudah sesuai permintaan, siap di-approve.';
+                    if (btnApprove) btnApprove.disabled = false;
+                } else if (diff < 0) {
+                    statusEl.className = 'card-footer bg-warning text-dark';
+                    statusEl.innerHTML = '<span class="fe fe-alert-triangle fe-16 mr-2"></span>Kurang ' +
+                        Math.abs(diff).toLocaleString('id-ID', {
+                            minimumFractionDigits: 2
+                        }) + ' dari jumlah yang diminta.';
+                    if (btnApprove) btnApprove.disabled = true;
+                } else {
+                    statusEl.className = 'card-footer bg-danger text-white';
+                    statusEl.innerHTML = '<span class="fe fe-alert-triangle fe-16 mr-2"></span>Melebihi ' +
+                        diff.toLocaleString('id-ID', {
+                            minimumFractionDigits: 2
+                        }) + ' dari jumlah yang diminta.';
+                    if (btnApprove) btnApprove.disabled = true;
+                }
+            }
+        }
+
+        document.querySelectorAll('.allocation-input').forEach(function(input) {
+            input.addEventListener('input', updateAllocationSummary);
+        });
+
+        // Tombol "Isi Ulang Saran FEFO" — kembalikan semua input ke nilai saran awal
+        const btnReset = document.getElementById('btnResetFefo');
+        if (btnReset) {
+            btnReset.addEventListener('click', function() {
+                document.querySelectorAll('.allocation-input').forEach(function(input) {
+                    input.value = input.dataset.suggested;
+                });
+                updateAllocationSummary();
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', updateAllocationSummary);
+
+        // Konfirmasi sebelum submit aksi-aksi penting
+        function confirmSubmit(selector, title, text, confirmText, color) {
+            document.querySelectorAll(selector).forEach(function(form) {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const target = this;
+
+                    Swal.fire({
+                        title: title,
+                        text: text,
+                        icon: 'warning',
+                        theme: 'dark',
+                        showCancelButton: true,
+                        confirmButtonText: confirmText,
+                        cancelButtonText: 'Batal',
+                        confirmButtonColor: color,
+                        reverseButtons: true,
+                    }).then((result) => {
+                        if (result.isConfirmed) target.submit();
+                    });
                 });
             });
         }
 
-        confirmSubmit('.form-approve', 'Approve transfer request?',
-            'Stok akan dikurangi dari gudang asal sesuai rekomendasi FEFO.', 'Ya, approve', '#28a745');
+        confirmSubmit('#approveForm', 'Approve transfer request?',
+            'Stok akan dikurangi dari gudang asal sesuai lot & qty yang dipilih.', 'Ya, approve', '#28a745');
         confirmSubmit('.form-cancel', 'Batalkan request ini?', 'Request akan dibatalkan dan tidak bisa diproses lagi.',
             'Ya, batalkan', '#6c757d');
     </script>

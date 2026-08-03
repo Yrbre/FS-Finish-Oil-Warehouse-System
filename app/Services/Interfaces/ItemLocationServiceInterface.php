@@ -52,4 +52,12 @@ interface ItemLocationServiceInterface
     public function getGrandTotalStock(): float;
     public function getNearExpiring(int $days = 30, int $limit = 10);
     public function getStockSummaryByWarehouse();
+
+    /**
+     * Semua lot yang masih ada stok di warehouse_id tertentu, urut FEFO,
+     * TANPA dipotong sesuai kebutuhan qty (beda dari allocateFefoAcrossWarehouses
+     * yang berhenti begitu qty terpenuhi). Dipakai untuk tampilkan pilihan
+     * lengkap ke user supaya bisa pilih manual, bukan cuma ikut saran FEFO.
+     */
+    public function getAvailableLotsAcrossWarehouses(int $itemId, array $warehouseIds);
 }

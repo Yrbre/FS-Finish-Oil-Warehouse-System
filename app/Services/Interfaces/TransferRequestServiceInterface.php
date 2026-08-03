@@ -32,7 +32,7 @@ interface TransferRequestServiceInterface
      * breakdown lot dicatat, status jadi in_transit.
      * $effectiveDate bisa diisi untuk backdate.
      */
-    public function approve(int $id, int $approvedBy, ?string $effectiveDate = null);
+    public function approve(int $id, int $approvedBy, ?string $effectiveDate = null, ?array $manualAllocation = null);
 
     /**
      * Konfirmasi barang sampai di gudang tujuan — stok masuk sesuai
@@ -50,4 +50,16 @@ interface TransferRequestServiceInterface
      * status masih new (belum ada approval maupun penolakan).
      */
     public function cancel(int $id, int $cancelledBy);
+    /**
+     * SEMUA lot yang tersedia di gudang sumber (IMC), urut FEFO, beserta
+     * saran qty per lot (hasil FEFO). Dipakai untuk form alokasi manual —
+     * approver bisa lihat & pilih dari lot manapun, tidak cuma yang
+     * disarankan otomatis.
+     *
+     * Return: [
+     *   'lots'        => Collection<ItemLocation>,
+     *   'suggestions' => array [item_location_id => qty saran FEFO],
+     * ]
+     */
+    public function getAvailableLots(int $id): array;
 }

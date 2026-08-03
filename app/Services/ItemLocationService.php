@@ -38,22 +38,6 @@ class ItemLocationService implements ItemLocationServiceInterface
         return $this->itemLocationRepository->update($id, $data);
     }
 
-    /**
-     * Business rule: tanggal expired selalu 1 tahun setelah tanggal produksi.
-     * Ditaruh di service (bukan Form Request) supaya berlaku konsisten
-     * dari pintu masuk manapun — form manual maupun transaksi PORC.
-     */
-    private function applyExpiryRule(array $data): array
-    {
-        if (! empty($data['production_date'])) {
-            $data['exp_date'] = \Carbon\Carbon::parse($data['production_date'])
-                ->addYear()
-                ->toDateString();
-        }
-
-        return $data;
-    }
-
     public function delete(int $id)
     {
         return $this->itemLocationRepository->delete($id);
@@ -69,6 +53,21 @@ class ItemLocationService implements ItemLocationServiceInterface
         return $this->itemLocationRepository->getTotalStockAllWarehouses($itemId);
     }
 
+    public function getGrandTotalStock(): float
+    {
+        return $this->itemLocationRepository->getGrandTotalStock();
+    }
+
+    public function getNearExpiring(int $days = 30, int $limit = 10)
+    {
+        return $this->itemLocationRepository->getNearExpiring($days, $limit);
+    }
+
+    public function getStockSummaryByWarehouse()
+    {
+        return $this->itemLocationRepository->getStockSummaryByWarehouse();
+    }
+
     public function allocateFefo(int $itemId, int $warehouseId, float $qtyNeeded): array
     {
         $lots = $this->itemLocationRepository->getFefoLots($itemId, $warehouseId);
@@ -77,7 +76,7 @@ class ItemLocationService implements ItemLocationServiceInterface
 
         if ($remaining > 0) {
             throw new \Exception(
-                "Stok tidak mencukupi. Kurang: " . $remaining
+                "Stok tidak mencukupi. Kurang: " . $remaining . " unit."
             );
         }
 
@@ -128,7 +127,6 @@ class ItemLocationService implements ItemLocationServiceInterface
         );
 
         if ($existing) {
-            // Lot yang sama sudah ada di gudang tujuan — cukup tambah qty
             return $this->itemLocationRepository->update($existing->id, [
                 'qty_weight' => (float) $existing->qty_weight + (float) $lotData['qty_weight'],
                 'qty_unit'   => (float) $existing->qty_unit + (float) ($lotData['qty_unit'] ?? 0),
@@ -142,10 +140,22 @@ class ItemLocationService implements ItemLocationServiceInterface
         ]));
     }
 
-    /**
-     * Logika inti FEFO: ambil dari lot paling dekat expired,
-     * kalau belum cukup lanjut ke lot berikutnya.
-     */
+    public function getAvailableLotsAcrossWarehouses(int $itemId, array $warehouseIds)
+    {
+        return $this->itemLocationRepository->getFefoLotsAcrossWarehouses($itemId, $warehouseIds);
+    }
+
+    private function applyExpiryRule(array $data): array
+    {
+        if (! empty($data['production_date'])) {
+            $data['exp_date'] = \Carbon\Carbon::parse($data['production_date'])
+                ->addYear()
+                ->toDateString();
+        }
+
+        return $data;
+    }
+
     private function buildAllocation($lots, float $qtyNeeded, ?float &$remaining): array
     {
         $remaining  = $qtyNeeded;
@@ -167,21 +177,5 @@ class ItemLocationService implements ItemLocationServiceInterface
         }
 
         return $allocation;
-    }
-
-    // REPORT
-    public function getGrandTotalStock(): float
-    {
-        return $this->itemLocationRepository->getGrandTotalStock();
-    }
-
-    public function getNearExpiring(int $days = 30, int $limit = 10)
-    {
-        return $this->itemLocationRepository->getNearExpiring($days, $limit);
-    }
-
-    public function getStockSummaryByWarehouse()
-    {
-        return $this->itemLocationRepository->getStockSummaryByWarehouse();
     }
 }

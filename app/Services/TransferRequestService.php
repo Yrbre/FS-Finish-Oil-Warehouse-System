@@ -77,9 +77,9 @@ class TransferRequestService implements TransferRequestServiceInterface
         ];
     }
 
-    public function approve(int $id, int $approvedBy, ?string $effectiveDate = null)
+    public function approve(int $id, int $approvedBy, ?string $effectiveDate = null, ?array $manualAllocation = null)
     {
-        return DB::transaction(function () use ($id, $approvedBy, $effectiveDate) {
+        return DB::transaction(function () use ($id, $approvedBy, $effectiveDate, $manualAllocation) {
             $request = $this->transferRequestRepository->getById($id);
 
             $this->guardApprover($approvedBy);
@@ -88,21 +88,16 @@ class TransferRequestService implements TransferRequestServiceInterface
                 throw new \Exception("Request ini sudah diproses sebelumnya.");
             }
 
-            $recommendation = $this->getRecommendation($id);
-
-            if (! $recommendation['is_fulfilled']) {
-                throw new \Exception(
-                    "Stok di gudang IMC tidak mencukupi. Kurang: " .
-                        number_format($recommendation['remaining_qty'], 2, ',', '.')
-                );
-            }
+            $allocation = ! empty($manualAllocation)
+                ? $this->buildManualAllocation($request, $manualAllocation)
+                : $this->buildAutoAllocation($id);
 
             $transDate = $effectiveDate ? Carbon::parse($effectiveDate) : now();
 
-            // Kelompokkan alokasi FEFO per warehouse asal — supaya bb_qty
-            // dihitung 1x per warehouse (kondisi SEBELUM lot-lot di warehouse
-            // itu dikurangi), bukan per lot.
-            $groupedByWarehouse = collect($recommendation['allocation'])
+            // Kelompokkan alokasi per warehouse asal — supaya bb_qty dihitung
+            // 1x per warehouse (kondisi SEBELUM lot-lot di warehouse itu
+            // dikurangi), bukan per lot.
+            $groupedByWarehouse = collect($allocation)
                 ->groupBy(fn($row) => $row['item_location']->warehouse_id);
 
             $details = [];
@@ -110,7 +105,6 @@ class TransferRequestService implements TransferRequestServiceInterface
             foreach ($groupedByWarehouse as $warehouseId => $rows) {
                 $warehouseId = (int) $warehouseId;
 
-                // bb_qty = stok warehouse ini SEBELUM dikurangi transfer ini
                 $bbQty = $this->itemLocationService->getTotalStock((int) $request->item_id, $warehouseId);
 
                 $totalTakenFromWarehouse = 0.0;
@@ -141,8 +135,6 @@ class TransferRequestService implements TransferRequestServiceInterface
 
                 $ebQty = $bbQty - $totalTakenFromWarehouse;
 
-                // Arsip riwayat — bb/eb ini kondisi NYATA warehouse itu saat
-                // transfer diproses, bukan hasil recalculate.
                 $this->stockLedgerService->record([
                     'item_id'      => $request->item_id,
                     'warehouse_id' => $warehouseId,
@@ -166,6 +158,83 @@ class TransferRequestService implements TransferRequestServiceInterface
                 'approved_date' => $transDate->toDateString(),
             ]);
         });
+    }
+
+    private function buildAutoAllocation(int $id): array
+    {
+        $recommendation = $this->getRecommendation($id);
+
+        if (! $recommendation['is_fulfilled']) {
+            throw new \Exception(
+                "Stok di gudang IMC tidak mencukupi. Kurang: " .
+                    number_format($recommendation['remaining_qty'], 2, ',', '.')
+            );
+        }
+
+        return $recommendation['allocation'];
+    }
+
+    /**
+     * Alokasi manual — validasi ulang dari NOL terhadap kondisi stok
+     * TERKINI (bukan percaya begitu saja data dari form), supaya aman
+     * dari race condition atau manipulasi input.
+     *
+     * $manualAllocation: [item_location_id => qty, ...]
+     */
+    private function buildManualAllocation(TransferRequest $request, array $manualAllocation): array
+    {
+        $sourceWarehouseIds = array_values(array_diff(
+            $this->warehouseService->getIdsByDepartmentCode(TransferRequest::SOURCE_DEPARTMENT_CODE),
+            [(int) $request->destination_warehouse_id]
+        ));
+
+        $allocation = [];
+        $totalQty   = 0.0;
+
+        foreach ($manualAllocation as $itemLocationId => $qty) {
+            $qty = (float) $qty;
+
+            if ($qty <= 0) {
+                continue;
+            }
+
+            $lot = $this->itemLocationService->getById((int) $itemLocationId);
+
+            if ((int) $lot->item_id !== (int) $request->item_id) {
+                throw new \Exception("Lot #{$itemLocationId} bukan untuk item yang sama dengan request ini.");
+            }
+
+            if (! in_array((int) $lot->warehouse_id, $sourceWarehouseIds)) {
+                throw new \Exception("Lot #{$itemLocationId} bukan berasal dari gudang IMC yang sah.");
+            }
+
+            if ($qty > (float) $lot->qty_weight) {
+                throw new \Exception(
+                    "Qty yang diambil dari lot " . ($lot->vendor_lot ?? "#{$lot->id}") .
+                        " melebihi stok tersedia (" . number_format((float) $lot->qty_weight, 2, ',', '.') . ")."
+                );
+            }
+
+            $allocation[] = ['item_location' => $lot, 'qty_to_take' => $qty];
+            $totalQty += $qty;
+        }
+
+        if (empty($allocation)) {
+            throw new \Exception("Belum ada lot yang dipilih untuk dikirim.");
+        }
+
+        $requestedQty = (float) $request->requested_qty;
+
+        // Toleransi kecil untuk pembulatan float
+        if (abs($totalQty - $requestedQty) > 0.01) {
+            throw new \Exception(
+                "Total qty yang dipilih (" . number_format($totalQty, 2, ',', '.') .
+                    ") harus sama persis dengan jumlah yang diminta (" .
+                    number_format($requestedQty, 2, ',', '.') . ")."
+            );
+        }
+
+        return $allocation;
     }
 
     public function receive(int $id, int $receivedBy, ?string $effectiveDate = null)
@@ -271,6 +340,37 @@ class TransferRequestService implements TransferRequestServiceInterface
             'cancelled_by' => $cancelledBy,
             'cancelled_at' => now(),
         ]);
+    }
+
+    public function getAvailableLots(int $id): array
+    {
+        $request = $this->transferRequestRepository->getById($id);
+
+        $sourceWarehouseIds = array_values(array_diff(
+            $this->warehouseService->getIdsByDepartmentCode(TransferRequest::SOURCE_DEPARTMENT_CODE),
+            [(int) $request->destination_warehouse_id]
+        ));
+
+        $lots = $this->itemLocationService->getAvailableLotsAcrossWarehouses(
+            (int) $request->item_id,
+            $sourceWarehouseIds
+        );
+
+        // Simulasikan FEFO di atas daftar lengkap ini, murni untuk saran
+        // pre-fill di form — tidak ada stok yang benar-benar dipotong.
+        $remaining    = (float) $request->requested_qty;
+        $suggestions  = [];
+
+        foreach ($lots as $lot) {
+            $take = $remaining > 0 ? min((float) $lot->qty_weight, $remaining) : 0;
+            $suggestions[$lot->id] = $take;
+            $remaining -= $take;
+        }
+
+        return [
+            'lots'        => $lots,
+            'suggestions' => $suggestions,
+        ];
     }
 
     private function guardApprover(int $userId): void
