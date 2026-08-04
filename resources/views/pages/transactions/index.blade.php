@@ -9,17 +9,21 @@
                     <h2 class="h5 page-title">Daftar Transaksi</h2>
                 </div>
                 <div class="col-auto">
-                    @if (auth()->user()->hasRole('admin'))
+                    @can('transactions.porc.create')
                         <a href="{{ route('transactions.porc.create') }}" class="btn btn-success btn-sm">
                             <span class="fe fe-plus fe-16 mr-1"></span>Supply Oil
                         </a>
-                    @endif
-                    <a href="{{ route('transactions.cons.create') }}" class="btn btn-danger btn-sm">
-                        <span class="fe fe-minus fe-16 mr-1"></span>Pemakaian
-                    </a>
-                    <a href="{{ route('transactions.adj.create') }}" class="btn btn-warning btn-sm">
-                        <span class="fe fe-edit-2 fe-16 mr-1"></span>Adjustment
-                    </a>
+                    @endcan
+                    @can('transactions.cons.create')
+                        <a href="{{ route('transactions.cons.create') }}" class="btn btn-danger btn-sm">
+                            <span class="fe fe-minus fe-16 mr-1"></span>Pemakaian
+                        </a>
+                    @endcan
+                    @can('transactions.adj.create')
+                        <a href="{{ route('transactions.adj.create') }}" class="btn btn-warning btn-sm">
+                            <span class="fe fe-edit-2 fe-16 mr-1"></span>Adjustment
+                        </a>
+                    @endcan
                 </div>
             </div>
 
@@ -33,9 +37,17 @@
                                     <label class="small text-muted">Jenis</label>
                                     <select id="filterDocType" class="form-control">
                                         <option value="">Semua Jenis</option>
-                                        <option value="PORC">PORC (Masuk)</option>
-                                        <option value="CONS">CONS (Keluar)</option>
-                                        <option value="ADJ">ADJ (Koreksi)</option>
+                                        @can('transactions.porc.view')
+                                            <option value="PORC">PORC (Masuk)</option>
+                                        @endcan
+
+                                        @can('transactions.cons.view')
+                                            <option value="CONS">CONS (Keluar)</option>
+                                        @endcan
+
+                                        @can('transactions.adj.view')
+                                            <option value="ADJ">ADJ (Koreksi)</option>
+                                        @endcan
                                     </select>
                                 </div>
                                 <div class="col-md-3">

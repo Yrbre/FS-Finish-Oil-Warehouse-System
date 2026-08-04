@@ -16,7 +16,7 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
 
     public function getAll()
     {
-        return $this->model->with(['item', 'warehouse']);
+        return $this->model->with(['item', 'warehouse'])->where('qty_weight', '>', 0);
     }
 
     public function getById(int $id)
