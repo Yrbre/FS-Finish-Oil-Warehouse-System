@@ -36,6 +36,7 @@ class PorcTransactionRequest extends FormRequest
             'qty_unit'        => ['nullable', 'numeric', 'min:0'],
             'package'         => ['nullable', 'string', 'max:50'],
             'notes'           => ['nullable', 'string'],
+            'demander_id'     => ['required', 'exists:departments,id'],
         ];
     }
 

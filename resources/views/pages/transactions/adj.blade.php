@@ -42,7 +42,7 @@
                                     @foreach ($warehouses as $wh)
                                         <option value="{{ $wh->id }}"
                                             {{ old('warehouse_id') == $wh->id ? 'selected' : '' }}>
-                                            {{ $wh->name }}
+                                            {{ $wh->name }} - {{ $wh->tag }}
                                         </option>
                                     @endforeach
                                 </select>

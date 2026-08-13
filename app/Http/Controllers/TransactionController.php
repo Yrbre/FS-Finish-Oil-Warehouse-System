@@ -6,6 +6,7 @@ use App\Http\Requests\AdjTransactionRequest;
 use App\Http\Requests\ConsTransactionRequest;
 use App\Http\Requests\PorcTransactionRequest;
 use App\Models\Transaction;
+use App\Services\Interfaces\DepartmentServiceInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\ItemServiceInterface;
 use App\Services\Interfaces\TransactionServiceInterface;
@@ -21,17 +22,20 @@ class TransactionController extends Controller
     protected ItemServiceInterface $itemService;
     protected WarehouseServiceInterface $warehouseService;
     protected ItemLocationServiceInterface $itemLocationService;
+    protected DepartmentServiceInterface $departmentService;
 
     public function __construct(
         TransactionServiceInterface $transactionService,
         ItemServiceInterface $itemService,
         WarehouseServiceInterface $warehouseService,
-        ItemLocationServiceInterface $itemLocationService
+        ItemLocationServiceInterface $itemLocationService,
+        DepartmentServiceInterface $departmentService
     ) {
         $this->transactionService  = $transactionService;
         $this->itemService         = $itemService;
         $this->warehouseService    = $warehouseService;
         $this->itemLocationService = $itemLocationService;
+        $this->departmentService   = $departmentService;
     }
 
     /* =====================================================================
@@ -75,7 +79,7 @@ class TransactionController extends Controller
                 return DataTables::of($transactions)
                     ->addIndexColumn()
                     ->addColumn('item', fn($row) => $row->item_desc)
-                    ->addColumn('warehouse', fn($row) => $row->warehouse->name)
+                    ->addColumn('warehouse', fn($row) => $row->warehouse->name . ' - ' . $row->warehouse->tag)
                     ->addColumn('trans_date', fn($row) => Carbon::parse($row->trans_date)->format('d-m-Y'))
                     ->addColumn('doc_type', fn($row) => strtoupper($row->doc_type))
                     ->addColumn('in_qty', fn($row) => (float) $row->in_qty > 0 ? number_format((float) $row->in_qty, 2, ',', '.') : '-')
@@ -110,8 +114,8 @@ class TransactionController extends Controller
     {
         $items      = $this->itemService->getAll()->get();
         $warehouses = $this->warehouseService->getAll()->get();
-
-        return view('pages.transactions.porc', compact('items', 'warehouses'));
+        $departments = $this->departmentService->getAll()->get();
+        return view('pages.transactions.porc', compact('items', 'warehouses', 'departments'));
     }
 
     public function storePorc(PorcTransactionRequest $request)

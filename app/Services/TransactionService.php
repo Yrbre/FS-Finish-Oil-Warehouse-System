@@ -160,6 +160,7 @@ class TransactionService implements TransactionServiceInterface
                 $this->itemLocationService->create([
                     'item_id'            => $transaction->item_id,
                     'warehouse_id'       => $transaction->warehouse_id,
+                    'demander_id'        => $data['demander_id'] ?? null,
                     'vendor_lot'         => $data['vendor_lot'] ?? null,
                     'receiving_lot'      => $this->itemLocationService->generateReceivingLot($transDate),
                     'production_date'    => $data['production_date'] ?? null,
