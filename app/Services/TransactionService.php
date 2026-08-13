@@ -53,7 +53,8 @@ class TransactionService implements TransactionServiceInterface
             $warehouseId = (int) $data['warehouse_id'];
             $transDate = Carbon::parse($data['trans_date']);
             $transQty  = (float) $data['trans_qty'];
-
+            $data['receiving_lot'] = $this->itemLocationService->generateReceivingLot($transDate);
+            $data['exp_date'] = $this->applyExpiryRule($data);
             // bb_qty = kondisi stok SEKARANG di item_locations, bukan dari
             // riwayat ledger. Ini "saldo ATM", diambil saat transaksi dibuat,
             // apapun tanggal transaksinya (termasuk kalau backdate).
@@ -85,7 +86,7 @@ class TransactionService implements TransactionServiceInterface
             $transaction = $this->transactionRepository->create($data);
 
             // Terapkan perubahan fisik ke item_locations
-            $this->applyStockMovement($transaction, $data);
+            $this->applyStockMovement($transaction, $data, $transDate);
 
             // Arsip ke ledger — murni catatan riwayat, tidak ada recalculate
             $this->stockLedgerService->record([
@@ -152,7 +153,7 @@ class TransactionService implements TransactionServiceInterface
     /**
      * Terapkan perubahan ke item_locations — inilah "sumber kebenaran" stok.
      */
-    private function applyStockMovement(Transaction $transaction, array $data): void
+    private function applyStockMovement(Transaction $transaction, array $data, \DateTime $transDate): void
     {
         switch ($transaction->doc_type) {
             case Transaction::DOC_PORC:
@@ -160,6 +161,7 @@ class TransactionService implements TransactionServiceInterface
                     'item_id'            => $transaction->item_id,
                     'warehouse_id'       => $transaction->warehouse_id,
                     'vendor_lot'         => $data['vendor_lot'] ?? null,
+                    'receiving_lot'      => $this->itemLocationService->generateReceivingLot($transDate),
                     'production_date'    => $data['production_date'] ?? null,
                     'qty_weight'         => $transaction->in_qty,
                     'qty_unit'           => $data['qty_unit'] ?? null,
@@ -232,5 +234,16 @@ class TransactionService implements TransactionServiceInterface
         } else {
             $this->itemLocationService->delete($lot->id);
         }
+    }
+
+    private function applyExpiryRule(array $data): string | null
+    {
+        if (! empty($data['production_date'])) {
+            $data['exp_date'] = \Carbon\Carbon::parse($data['production_date'])
+                ->addYear()
+                ->toDateString();
+        }
+
+        return $data['exp_date'] ?? null;
     }
 }

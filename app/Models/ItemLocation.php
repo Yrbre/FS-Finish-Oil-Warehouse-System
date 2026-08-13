@@ -16,6 +16,7 @@ class ItemLocation extends Model
         'warehouse_id',
         'demander_id',
         'vendor_lot',
+        'receiving_lot',
         'production_date',
         'exp_date',
         'qty_weight',

@@ -60,4 +60,6 @@ interface ItemLocationServiceInterface
      * lengkap ke user supaya bisa pilih manual, bukan cuma ikut saran FEFO.
      */
     public function getAvailableLotsAcrossWarehouses(int $itemId, array $warehouseIds);
+
+    public function generateReceivingLot($receivingDate);
 }

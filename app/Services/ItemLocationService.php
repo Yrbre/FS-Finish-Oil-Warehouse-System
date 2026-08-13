@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\ItemLocation;
 use App\Repositories\Interfaces\ItemLocationRepositoryInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class ItemLocationService implements ItemLocationServiceInterface
 {
@@ -28,12 +31,14 @@ class ItemLocationService implements ItemLocationServiceInterface
     {
         $data = $this->applyExpiryRule($data);
 
+
         return $this->itemLocationRepository->create($data);
     }
 
     public function update(int $id, array $data)
     {
         $data = $this->applyExpiryRule($data);
+
 
         return $this->itemLocationRepository->update($id, $data);
     }
@@ -177,5 +182,26 @@ class ItemLocationService implements ItemLocationServiceInterface
         }
 
         return $allocation;
+    }
+
+    public function generateReceivingLot($receivingDate)
+    {
+        $prefix = 'TFCO-';
+        $receivingDate = Carbon::parse($receivingDate)->format('ymd');
+
+        return DB::transaction(function () use ($prefix, $receivingDate) {
+            $lastRecord = ItemLocation::withTrashed()
+                ->where('receiving_lot', 'like', $prefix . $receivingDate . '%')
+                ->orderBy('receiving_lot', 'desc')
+                ->lockForUpdate()
+                ->first();
+
+
+            $newNumber = $lastRecord
+                ? ((int) substr($lastRecord->receiving_lot, strlen($prefix . $receivingDate))) + 1
+                : 1;
+
+            return $prefix . $receivingDate . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
+        });
     }
 }

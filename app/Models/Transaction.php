@@ -33,6 +33,7 @@ class Transaction extends Model
         'bb_qty',
         'eb_qty',
         'vendor_lot',
+        'receiving_lot',
         'production_date',
         'exp_date',
         'qty_unit',

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 class TransferRequest extends Model
 {
@@ -122,15 +123,18 @@ class TransferRequest extends Model
         $prefix = 'TRNS-';
         $date   = now()->format('ymd');
 
-        $lastRecord = self::withTrashed()
-            ->where('transfer_code', 'like', $prefix . $date . '%')
-            ->orderBy('transfer_code', 'desc')
-            ->first();
+        return DB::transaction(function () use ($prefix, $date) {
+            $lastRecord = self::withTrashed()
+                ->where('transfer_code', 'like', $prefix . $date . '%')
+                ->orderBy('transfer_code', 'desc')
+                ->lockForUpdate()
+                ->first();
 
-        $newNumber = $lastRecord
-            ? ((int) substr($lastRecord->transfer_code, strlen($prefix . $date))) + 1
-            : 1;
+            $newNumber = $lastRecord
+                ? ((int) substr($lastRecord->transfer_code, strlen($prefix . $date))) + 1
+                : 1;
 
-        return $prefix . $date . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
+            return $prefix . $date . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
+        });
     }
 }
