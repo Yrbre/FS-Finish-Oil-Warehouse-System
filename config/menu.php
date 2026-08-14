@@ -34,7 +34,7 @@ return [
         'permission' => 'create-transaction',
     ],
     [
-        'label' => 'Transfer Requests',
+        'label' => 'Permintaan Kirim Barang ',
         'route' => 'transfer-requests.index',
         'icon' => 'ti ti-truck',
         'permission' => 'manage-transfer-request',

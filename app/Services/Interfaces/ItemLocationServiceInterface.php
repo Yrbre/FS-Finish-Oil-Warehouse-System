@@ -12,6 +12,7 @@ interface ItemLocationServiceInterface
 
     public function getTotalStock(int $itemId, int $warehouseId): float;
     public function getTotalStockAllWarehouses(int $itemId): float;
+    public function getTotalStockByDepartment(int | null $itemId, int $departmentId): float;
 
     /**
      * Alokasi FEFO dalam 1 warehouse. Throw Exception kalau stok kurang.

@@ -12,24 +12,31 @@ class UserRequest extends FormRequest
         return true;
     }
 
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('password') === '') {
+            $this->merge(['password' => null]);
+        }
+    }
+
     public function rules(): array
     {
-        $userId  = $this->route('user');
-        $isEdit  = (bool) $userId;
+        $userId = $this->route('id');
+        $isEdit = (bool) $userId;
 
         return [
-            'name'          => ['required', 'string', 'max:255'],
-            'email'         => [
+            'name'                  => ['required', 'string', 'max:255'],
+            'email'                 => [
                 'required',
                 'email',
                 'max:255',
                 Rule::unique('users', 'email')->ignore($userId),
             ],
-            // Wajib saat create, opsional saat edit (kosong = tidak diubah)
-            'password'      => [$isEdit ? 'nullable' : 'required', 'string', 'min:8', 'confirmed'],
-            'department_id' => ['required', 'exists:departments,id'],
-            'role'          => ['required', 'exists:roles,name'],
-            'is_transfer_approver' => ['nullable', 'boolean'],
+            'password'              => [$isEdit ? 'nullable' : 'required', 'string', 'min:8', 'confirmed'],
+            'department_id'         => ['required', 'exists:departments,id'],
+            'role'                  => ['required', 'exists:roles,name'],
+            'is_transfer_approver'  => ['nullable', 'boolean'],
         ];
     }
 

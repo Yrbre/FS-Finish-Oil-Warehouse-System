@@ -14,6 +14,8 @@ interface ItemLocationRepositoryInterface
      */
     public function getTotalStock(int $itemId, int $warehouseId): float;
 
+
+    public function getTotalStockByDepartment(int | null $itemId, int $departmentId): float;
     /**
      * Total stok 1 item di seluruh warehouse.
      */

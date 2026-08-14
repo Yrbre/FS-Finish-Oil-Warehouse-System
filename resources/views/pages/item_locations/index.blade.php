@@ -38,7 +38,8 @@
                                     <select id="filterWarehouse" class="form-control select2">
                                         <option value="">Semua Gudang</option>
                                         @foreach ($warehouses as $wh)
-                                            <option value="{{ $wh->id }}">{{ $wh->name }}</option>
+                                            <option value="{{ $wh->id }}">{{ $wh->name }} - {{ $wh->tag }}
+                                            </option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -52,7 +53,7 @@
                                         <th>Gudang</th>
                                         <th>Vendor Lot</th>
                                         <th>Exp Date</th>
-                                        <th>Stok</th>
+                                        <th>Stok Gudang</th>
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>

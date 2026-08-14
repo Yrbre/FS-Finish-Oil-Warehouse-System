@@ -61,8 +61,8 @@ class TransferRequestController extends Controller
 
             return view('pages.transfer_requests.index');
         } catch (\Exception $e) {
-            Log::error('Gagal menampilkan transfer request: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Data transfer request tidak dapat ditampilkan.');
+            Log::error('Gagal menampilkan Permintaan Kirim Barang : ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Data Permintaan Kirim Barang  tidak dapat ditampilkan.');
         }
     }
 
@@ -88,9 +88,9 @@ class TransferRequestController extends Controller
             $transferRequest = $this->transferRequestService->create($data, auth()->id());
 
             return redirect()->route('transfer-requests.show', $transferRequest->id)
-                ->with('success', 'Transfer request berhasil dibuat: ' . $transferRequest->transfer_code);
+                ->with('success', 'Permintaan Kirim Barang berhasil dibuat: ' . $transferRequest->transfer_code);
         } catch (\Exception $e) {
-            Log::error('Gagal membuat transfer request: ' . $e->getMessage());
+            Log::error('Gagal membuat Permintaan Kirim Barang: ' . $e->getMessage());
             return redirect()->back()->with('error', $e->getMessage())->withInput();
         }
     }
@@ -113,8 +113,8 @@ class TransferRequestController extends Controller
 
             return view('pages.transfer_requests.show', compact('transferRequest', 'recommendation', 'availableLots'));
         } catch (\Exception $e) {
-            Log::error('Gagal menampilkan detail transfer request: ' . $e->getMessage());
-            return redirect()->route('transfer-requests.index')->with('error', 'Transfer request tidak ditemukan.');
+            Log::error('Gagal menampilkan detail Permintaan Kirim Barang : ' . $e->getMessage());
+            return redirect()->route('transfer-requests.index')->with('error', 'Permintaan Kirim Barang tidak ditemukan.');
         }
     }
 
@@ -140,9 +140,9 @@ class TransferRequestController extends Controller
             );
 
             return redirect()->route('transfer-requests.show', $id)
-                ->with('success', 'Transfer request disetujui, stok telah dikirim (' . $transferRequest->transfer_code . ').');
+                ->with('success', 'Permintaan Kirim Barang disetujui, stok telah dikirim (' . $transferRequest->transfer_code . ').');
         } catch (\Exception $e) {
-            Log::error('Gagal approve transfer request: ' . $e->getMessage());
+            Log::error('Gagal approve Permintaan Kirim Barang: ' . $e->getMessage());
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -159,7 +159,7 @@ class TransferRequestController extends Controller
             return redirect()->route('transfer-requests.show', $id)
                 ->with('success', 'Barang berhasil dikonfirmasi diterima.');
         } catch (\Exception $e) {
-            Log::error('Gagal konfirmasi terima transfer request: ' . $e->getMessage());
+            Log::error('Gagal konfirmasi terima Permintaan Kirim Barang : ' . $e->getMessage());
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -173,9 +173,9 @@ class TransferRequestController extends Controller
                 $request->validated()['reject_reason']
             );
 
-            return redirect()->route('transfer-requests.index')->with('success', 'Transfer request ditolak.');
+            return redirect()->route('transfer-requests.index')->with('success', 'Permintaan Kirim Barang ditolak.');
         } catch (\Exception $e) {
-            Log::error('Gagal reject transfer request: ' . $e->getMessage());
+            Log::error('Gagal reject Permintaan Kirim Barang: ' . $e->getMessage());
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -185,9 +185,9 @@ class TransferRequestController extends Controller
         try {
             $this->transferRequestService->cancel((int) $id, auth()->id());
 
-            return redirect()->route('transfer-requests.index')->with('success', 'Transfer request dibatalkan.');
+            return redirect()->route('transfer-requests.index')->with('success', 'Permintaan Kirim Barang dibatalkan.');
         } catch (\Exception $e) {
-            Log::error('Gagal cancel transfer request: ' . $e->getMessage());
+            Log::error('Gagal cancel Permintaan Kirim Barang: ' . $e->getMessage());
             return redirect()->back()->with('error', $e->getMessage());
         }
     }

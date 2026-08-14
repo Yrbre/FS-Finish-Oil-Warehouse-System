@@ -90,7 +90,8 @@
                                 Jadikan Approver Transfer (IMC)
                             </label>
                             <small class="form-text text-muted">
-                                User ini akan bisa approve/reject semua Transfer Request, tidak terikat gudang tertentu.
+                                User ini akan bisa approve/reject semua Permintaan Kirim Barang , tidak terikat gudang
+                                tertentu.
                             </small>
                         </div>
 

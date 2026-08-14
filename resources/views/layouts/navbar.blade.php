@@ -78,7 +78,7 @@
                             @can('transfer-requests.view')
                                 <li>
                                     <a class="nav-link pl-lg-2" href="{{ route('transfer-requests.index') }}"><span
-                                            class="ml-1">Transfer Request</span></a>
+                                            class="ml-1">Permintaan Kirim Barang </span></a>
                                 </li>
                             @endcan
                         </ul>

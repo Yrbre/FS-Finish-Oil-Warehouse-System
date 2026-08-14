@@ -53,6 +53,11 @@ class ItemLocationService implements ItemLocationServiceInterface
         return $this->itemLocationRepository->getTotalStock($itemId, $warehouseId);
     }
 
+    public function getTotalStockByDepartment(int | null $itemId, int $departmentId): float
+    {
+        return $this->itemLocationRepository->getTotalStockByDepartment($itemId, $departmentId);
+    }
+
     public function getTotalStockAllWarehouses(int $itemId): float
     {
         return $this->itemLocationRepository->getTotalStockAllWarehouses($itemId);

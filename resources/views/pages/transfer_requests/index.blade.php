@@ -6,7 +6,7 @@
 
             <div class="row align-items-center mb-2">
                 <div class="col">
-                    <h2 class="h5 page-title">Transfer Request</h2>
+                    <h2 class="h5 page-title">Permintaan Kirim Barang</h2>
                 </div>
                 @can('transfer-requests.create')
                     <div class="col-auto">

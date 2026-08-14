@@ -47,6 +47,19 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
         return (float) $this->model->where('item_id', $itemId)->where('warehouse_id', $warehouseId)->sum('qty_weight');
     }
 
+    public function getTotalStockByDepartment(int | null $itemId, int $departmentId): float
+    {
+        $query = $this->model->whereHas('warehouse', function ($q) use ($departmentId) {
+            $q->where('department_id', $departmentId);
+        });
+
+        if ($itemId !== null) {
+            $query->where('item_id', $itemId);
+        }
+
+        return (float) $query->sum('qty_weight');
+    }
+
     public function getTotalStockAllWarehouses(int $itemId): float
     {
         return (float) $this->model->where('item_id', $itemId)->sum('qty_weight');

@@ -39,10 +39,17 @@ class ItemLocationController extends Controller
 
     public function index(Request $request)
     {
+
         try {
             if ($request->ajax()) {
-                $itemLocations = $this->itemLocationService->getAll();
+                if (auth()->user()->department->code === 'IMC') {
+                    $itemLocations = $this->itemLocationService->getAll();
+                } else {
 
+                    $itemLocations = $this->itemLocationService->getAll()->whereHas('warehouse', function ($q) {
+                        $q->where('department_id', auth()->user()->department_id);
+                    });
+                }
                 if ($request->item_id) {
                     $itemLocations->where('item_id', $request->item_id);
                 }
@@ -50,10 +57,11 @@ class ItemLocationController extends Controller
                     $itemLocations->where('warehouse_id', $request->warehouse_id);
                 }
 
+
                 return DataTables::of($itemLocations)
                     ->addIndexColumn()
-                    ->addColumn('item', fn($row) => $row->item->item_desc)
-                    ->addColumn('warehouse', fn($row) => $row->warehouse->name)
+                    ->addColumn('item', fn($row) => $row->item->item_no . ' - ' . $row->item->item_desc)
+                    ->addColumn('warehouse', fn($row) => $row->warehouse->name . ' - ' . $row->warehouse->tag)
                     ->addColumn('exp_date', fn($row) => $row->exp_date ? $row->exp_date->format('d-m-Y') : '-')
                     ->addColumn('qty_weight', fn($row) => number_format((float) $row->qty_weight, 2, ',', '.') . ' ' . $row->item->item_uom)
                     ->addColumn('action', function ($row) {
@@ -70,7 +78,11 @@ class ItemLocationController extends Controller
             }
 
             $items      = $this->itemService->getAll()->get();
-            $warehouses = $this->warehouseService->getAll()->get();
+            if (auth()->user()->department->code === 'IMC') {
+                $warehouses = $this->warehouseService->getAll()->get();
+            } else {
+                $warehouses = $this->warehouseService->getByDepartment(auth()->user()->department_id);
+            }
 
             return view('pages.item_locations.index', compact('items', 'warehouses'));
         } catch (\Exception $e) {

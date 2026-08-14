@@ -183,7 +183,7 @@
                                 <form action="{{ route('transfer-requests.reject', $transferRequest->id) }}" method="POST">
                                     @csrf
                                     <div class="modal-header">
-                                        <h5 class="modal-title">Tolak Transfer Request</h5>
+                                        <h5 class="modal-title">Tolak Permintaan Kirim Barang </h5>
                                         <button type="button" class="close"
                                             data-dismiss="modal"><span>&times;</span></button>
                                     </div>
@@ -395,7 +395,7 @@
             });
         }
 
-        confirmSubmit('#approveForm', 'Approve transfer request?',
+        confirmSubmit('#approveForm', 'Approve Permintaan Kirim Barang ?',
             'Stok akan dikurangi dari gudang asal sesuai lot & qty yang dipilih.', 'Ya, approve', '#28a745');
         confirmSubmit('.form-cancel', 'Batalkan request ini?', 'Request akan dibatalkan dan tidak bisa diproses lagi.',
             'Ya, batalkan', '#6c757d');

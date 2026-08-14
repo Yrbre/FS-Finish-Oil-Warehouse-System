@@ -16,7 +16,7 @@ interface TransferRequestRepositoryInterface
     public function createDetails(array $details): void;
 
     /**
-     * Semua breakdown lot milik 1 transfer request.
+     * Semua breakdown lot milik 1 Permintaan Kirim Barang .
      */
     public function getDetails(int $transferRequestId);
 

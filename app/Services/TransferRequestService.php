@@ -376,7 +376,7 @@ class TransferRequestService implements TransferRequestServiceInterface
     private function guardApprover(int $userId): void
     {
         if (! $this->transferRequestRepository->isApprover($userId)) {
-            throw new \Exception("Anda tidak memiliki wewenang untuk memproses transfer request.");
+            throw new \Exception("Anda tidak memiliki wewenang untuk memproses Permintaan Kirim Barang .");
         }
     }
 }

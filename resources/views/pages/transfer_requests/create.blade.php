@@ -6,7 +6,7 @@
 
             <div class="row align-items-center mb-2">
                 <div class="col">
-                    <h2 class="h5 page-title">Buat Transfer Request</h2>
+                    <h2 class="h5 page-title">Buat Permintaan Kirim Barang </h2>
                     <p class="text-muted mb-0">
                         Gudang asal ditentukan otomatis oleh sistem (FEFO lintas gudang) saat request di-approve.
                     </p>

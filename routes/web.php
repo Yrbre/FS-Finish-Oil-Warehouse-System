@@ -152,7 +152,7 @@ Route::middleware('auth')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Transfer Request
+| Transfer Request / Permintaan Kirim Barang
 |--------------------------------------------------------------------------
 */
 Route::middleware('auth')->group(function () {
