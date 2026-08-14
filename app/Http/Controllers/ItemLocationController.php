@@ -62,7 +62,8 @@ class ItemLocationController extends Controller
                     ->addIndexColumn()
                     ->addColumn('item', fn($row) => $row->item->item_no . ' - ' . $row->item->item_desc)
                     ->addColumn('warehouse', fn($row) => $row->warehouse->name . ' - ' . $row->warehouse->tag)
-                    ->addColumn('exp_date', fn($row) => $row->exp_date ? $row->exp_date->format('d-m-Y') : '-')
+                    ->addColumn('exp_date', fn($row) => $row->exp_date ? $row->exp_date->format('M Y') : '-')
+                    ->addColumn('exp_by_receiving_at', fn($row) => $row->exp_by_receiving_at ? $row->exp_by_receiving_at->format('d M Y') : '-')
                     ->addColumn('qty_weight', fn($row) => number_format((float) $row->qty_weight, 2, ',', '.') . ' ' . $row->item->item_uom)
                     ->addColumn('action', function ($row) {
                         return '

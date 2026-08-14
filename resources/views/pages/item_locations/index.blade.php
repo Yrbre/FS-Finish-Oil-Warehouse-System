@@ -52,7 +52,8 @@
                                         <th>Item</th>
                                         <th>Gudang</th>
                                         <th>Vendor Lot</th>
-                                        <th>Exp Date</th>
+                                        <th>Exp Date by Production</th>
+                                        <th>Exp Date by Receiving</th>
                                         <th>Stok Gudang</th>
                                         <th>Aksi</th>
                                     </tr>
@@ -105,6 +106,10 @@
                     {
                         data: 'exp_date',
                         name: 'exp_date'
+                    },
+                    {
+                        data: 'exp_by_receiving_at',
+                        name: 'exp_by_receiving_at'
                     },
                     {
                         data: 'qty_weight',

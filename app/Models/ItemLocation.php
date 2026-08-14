@@ -24,12 +24,14 @@ class ItemLocation extends Model
         'package',
         'type',
         'received_date',
+        'exp_by_receiving_at',
         'is_warehouse_stock',
     ];
 
     protected $casts = [
         'production_date'    => 'date',
         'exp_date'           => 'date',
+        'exp_by_receiving_at' => 'date',
         'received_date'      => 'date',
         'qty_weight'         => 'decimal:2',
         'qty_unit'           => 'decimal:2',

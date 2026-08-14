@@ -55,6 +55,7 @@ class TransactionService implements TransactionServiceInterface
             $transQty  = (float) $data['trans_qty'];
             $data['receiving_lot'] = $this->itemLocationService->generateReceivingLot($transDate);
             $data['exp_date'] = $this->applyExpiryRule($data);
+            $data['exp_by_receiving_at'] = $this->applyExpiryByReceiving($data);
             // bb_qty = kondisi stok SEKARANG di item_locations, bukan dari
             // riwayat ledger. Ini "saldo ATM", diambil saat transaksi dibuat,
             // apapun tanggal transaksinya (termasuk kalau backdate).
@@ -168,6 +169,7 @@ class TransactionService implements TransactionServiceInterface
                     'qty_unit'           => $data['qty_unit'] ?? null,
                     'package'            => $data['package'] ?? null,
                     'received_date'      => $transaction->trans_date,
+                    'exp_by_receiving_at' => $data['exp_by_receiving_at'] ?? null,
                     'is_warehouse_stock' => true,
                 ]);
                 break;
@@ -246,5 +248,16 @@ class TransactionService implements TransactionServiceInterface
         }
 
         return $data['exp_date'] ?? null;
+    }
+
+    private function applyExpiryByReceiving(array $data): string | null
+    {
+        if (! empty($data['trans_date'])) {
+            $data['exp_by_receiving_at'] = \Carbon\Carbon::parse($data['trans_date'])
+                ->addYear()
+                ->toDateString();
+        }
+
+        return $data['exp_by_receiving_at'] ?? null;
     }
 }
