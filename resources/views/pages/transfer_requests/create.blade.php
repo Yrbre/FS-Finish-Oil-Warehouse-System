@@ -66,7 +66,7 @@
                             </div>
 
                             <div class="form-group col-md-6">
-                                <label>Tanggal Barang Harus Sampai <span class="text-danger">*</span></label>
+                                <label>Need By Date <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control @error('expected_date') is-invalid @enderror"
                                     name="expected_date" value="{{ old('expected_date') }}" required>
                                 @error('expected_date')
