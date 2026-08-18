@@ -74,9 +74,25 @@
                                     value="{{ old('vendor_lot', $itemLocation->vendor_lot) }}">
                             </div>
                             <div class="form-group col-md-6">
-                                <label>Package</label>
-                                <input type="text" class="form-control uppercase" name="package"
-                                    value="{{ old('package', $itemLocation->package) }}">
+                                <label>Kemasan</label>
+                                <select class="form-control select2 @error('package') is-invalid @enderror" name="package"
+                                    required>
+                                    <option value="BAG"
+                                        {{ old('package', $itemLocation->package) == 'BAG' ? 'selected' : '' }}>BAG
+                                    </option>
+                                    <option value="CAN"
+                                        {{ old('package', $itemLocation->package) == 'CAN' ? 'selected' : '' }}>CAN
+                                    </option>
+                                    <option value="DRUM"
+                                        {{ old('package', $itemLocation->package) == 'DRUM' ? 'selected' : '' }}>DRUM
+                                    </option>
+                                    <option value="TOTE"
+                                        {{ old('package', $itemLocation->package) == 'TOTE' ? 'selected' : '' }}>TOTE
+                                    </option>
+                                </select>
+                                @error('package')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
                             </div>
                         </div>
 

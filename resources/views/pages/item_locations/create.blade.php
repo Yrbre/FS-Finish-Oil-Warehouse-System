@@ -75,9 +75,17 @@
                                     value="{{ old('vendor_lot') }}" placeholder="Contoh: VENLOT-202601">
                             </div>
                             <div class="form-group col-md-6">
-                                <label>Package</label>
-                                <input type="text" class="form-control uppercase" name="package"
-                                    value="{{ old('package') }}" placeholder="Contoh: DRUM">
+                                <label>Kemasan</label>
+                                <select class="form-control select2 @error('package') is-invalid @enderror" name="package"
+                                    required>
+                                    <option value="BAG">BAG</option>
+                                    <option value="CAN">CAN</option>
+                                    <option value="DRUM">DRUM</option>
+                                    <option value="TOTE">TOTE</option>
+                                </select>
+                                @error('package')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
                             </div>
                         </div>
 
