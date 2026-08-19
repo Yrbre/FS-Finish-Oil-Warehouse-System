@@ -152,7 +152,7 @@ class TransferRequestService implements TransferRequestServiceInterface
             $this->transferRequestRepository->createDetails($details);
 
             return $this->transferRequestRepository->update($id, [
-                'status'        => TransferRequest::STATUS_IN_TRANSIT,
+                'status'        => TransferRequest::STATUS_APPROVED,
                 'approved_by'   => $approvedBy,
                 'approved_at'   => now(),
                 'approved_date' => $transDate->toDateString(),

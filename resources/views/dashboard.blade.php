@@ -127,10 +127,10 @@
                                         @endphp
                                         <tr
                                             class="{{ $daysLeft < 0 ? 'table-danger' : ($daysLeft <= 7 ? 'table-warning' : '') }}">
-                                            <td>{{ $lot->item->item_desc }}</td>
-                                            <td>{{ $lot->warehouse->name }}</td>
-                                            <td>{{ $lot->exp_date->format('d-m-Y') }}</td>
-                                            <td class="text-right">
+                                            <td class="text-dark">{{ $lot->item->item_desc }}</td>
+                                            <td class="text-dark">{{ $lot->warehouse->name }}</td>
+                                            <td class="text-dark">{{ $lot->exp_date->format('d-m-Y') }}</td>
+                                            <td class="text-right text-dark">
                                                 {{ number_format((float) $lot->qty_weight, 2, ',', '.') }}</td>
                                         </tr>
                                     @empty

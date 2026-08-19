@@ -14,6 +14,7 @@ class TransferRequest extends Model
     // Alur status: new → in_transit → received
     // Cabang: new → rejected (oleh IMC) | new → cancelled (oleh requester)
     const STATUS_NEW        = 'new';
+    const STATUS_APPROVED   = 'approved';
     const STATUS_IN_TRANSIT = 'in_transit';
     const STATUS_RECEIVED   = 'received';
     const STATUS_REJECTED   = 'rejected';

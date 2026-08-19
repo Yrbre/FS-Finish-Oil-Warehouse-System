@@ -164,7 +164,11 @@ Route::middleware('auth')->group(function () {
         Route::post('transfer-requests', [TransferRequestController::class, 'store'])->name('transfer-requests.store');
     });
 
+
+
     Route::middleware('can:transfer-requests.view')->group(function () {
+        Route::match(['get', 'post'], '/transfer-requests/cetak-batch', [TransferRequestController::class, 'cetakBatch'])
+            ->name('transfer-requests.cetak-batch');
         Route::get('transfer-requests', [TransferRequestController::class, 'index'])->name('transfer-requests.index');
         Route::get('transfer-requests/{id}', [TransferRequestController::class, 'show'])->name('transfer-requests.show');
     });

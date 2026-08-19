@@ -8,6 +8,12 @@
                 <div class="col">
                     <h2 class="h5 page-title">Permintaan Kirim Barang</h2>
                 </div>
+                <div class="col-auto">
+                    <button type="button" id="btn-cetak-terpilih" class="btn btn-warning" disabled>
+                        <span class="fe fe-printer fe-16 mr-2"></span>
+                        Cetak TTB Terpilih (<span id="jumlah-terpilih">0</span>)
+                    </button>
+                </div>
                 @can('transfer-requests.create')
                     <div class="col-auto">
                         <a href="{{ route('transfer-requests.create') }}" class="btn btn-primary btn-sm">
@@ -39,6 +45,7 @@
                             <table class="table" id="dataTableTransferRequest" style="width:100%">
                                 <thead>
                                     <tr>
+                                        <th><input type="checkbox" id="check-all"></th>
                                         <th>No</th>
                                         <th>Kode</th>
                                         <th>Item</th>
@@ -51,7 +58,11 @@
                                     </tr>
                                 </thead>
                             </table>
-
+                            <form id="form-cetak-batch" action="{{ route('transfer-requests.cetak-batch') }}" method="POST"
+                                target="_blank">
+                                @csrf
+                                <div id="hidden-ids-container"></div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -69,7 +80,7 @@
                 serverSide: true,
                 responsive: true,
                 order: [
-                    [0, 'desc']
+                    [1, 'desc']
                 ],
                 ajax: {
                     url: '{{ route('transfer-requests.index') }}',
@@ -78,6 +89,12 @@
                     },
                 },
                 columns: [{
+                        data: 'checkbox',
+                        name: 'checkbox',
+                        orderable: false,
+                        searchable: false
+                    },
+                    {
                         data: 'DT_RowIndex',
                         name: 'DT_RowIndex',
                         orderable: false,
@@ -125,6 +142,51 @@
 
             $('#filterStatus').on('change', function() {
                 table.ajax.reload();
+            });
+
+            // ==== Bagian pilih & cetak terpilih ====
+            let selectedIds = new Set();
+
+            function updateTombolCetak() {
+                $('#jumlah-terpilih').text(selectedIds.size);
+                $('#btn-cetak-terpilih').prop('disabled', selectedIds.size === 0);
+            }
+
+            // checkbox per baris (delegasi ke #dataTableTransferRequad, bukan id yang salah)
+            $('#dataTableTransferRequest').on('change', '.row-checkbox', function() {
+                let id = $(this).val();
+                if ($(this).is(':checked')) {
+                    selectedIds.add(id);
+                } else {
+                    selectedIds.delete(id);
+                }
+                updateTombolCetak();
+            });
+
+            // checkbox pilih semua (hanya baris yang sedang tampil di halaman ini)
+            $('#check-all').on('change', function() {
+                let checked = $(this).is(':checked');
+                $('#dataTableTransferRequest .row-checkbox').prop('checked', checked).trigger('change');
+            });
+
+            // reset centang tiap kali data di-reload (ganti halaman/filter)
+            // biar checkbox "select all" ikut ke-uncheck otomatis
+            table.on('draw', function() {
+                $('#check-all').prop('checked', false);
+            });
+
+            // klik tombol cetak
+            $('#btn-cetak-terpilih').on('click', function() {
+                if (selectedIds.size === 0) return;
+
+                let container = $('#hidden-ids-container');
+                container.empty();
+
+                selectedIds.forEach(function(id) {
+                    container.append(`<input type="hidden" name="ids[]" value="${id}">`);
+                });
+
+                $('#form-cetak-batch').submit();
             });
         });
     </script>

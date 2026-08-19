@@ -45,7 +45,8 @@
                         </div>
                         <div class="col-md-3 mb-3">
                             <p class="small text-muted mb-1">Gudang Tujuan</p>
-                            <strong>{{ $transferRequest->destinationWarehouse->name }}</strong>
+                            <strong>{{ $transferRequest->destinationWarehouse->name }} -
+                                {{ $transferRequest->destinationWarehouse->tag }}</strong>
                         </div>
                         <div class="col-md-2 mb-3">
                             <p class="small text-muted mb-1">Harus Sampai</p>
@@ -96,7 +97,7 @@
                                         @forelse ($availableLots['lots'] as $lot)
                                             @php $suggested = $availableLots['suggestions'][$lot->id] ?? 0; @endphp
                                             <tr>
-                                                <td>{{ $lot->warehouse->name }}</td>
+                                                <td>{{ $lot->warehouse->name }} - {{ $lot->warehouse->tag }}</td>
                                                 <td>{{ $lot->vendor_lot ?? '-' }}</td>
                                                 <td>{{ $lot->exp_date?->format('d-m-Y') ?? '-' }}</td>
                                                 <td class="text-right">
@@ -228,7 +229,8 @@
                                 <tbody>
                                     @foreach ($transferRequest->details as $detail)
                                         <tr>
-                                            <td>{{ $detail->sourceWarehouse->name }}</td>
+                                            <td>{{ $detail->sourceWarehouse->name }} - {{ $detail->sourceWarehouse->tag }}
+                                            </td>
                                             <td>{{ $detail->vendor_lot ?? '-' }}</td>
                                             <td>{{ $detail->exp_date?->format('d-m-Y') ?? '-' }}</td>
                                             <td class="text-right">
@@ -276,6 +278,16 @@
                         {{ $transferRequest->received_date?->format('d-m-Y') }}.
                     </div>
                 @endif
+            @endif
+
+            @if ($transferRequest->status === 'approved')
+                <div class="card shadow mb-4">
+                    <div class="card-body">
+                        <button type="submit" class="btn btn-success btn-receive">
+                            <span class="fe fe-check-circle fe-16 mr-2"></span>Print TTB
+                        </button>
+                    </div>
+                </div>
             @endif
 
             {{-- Status: REJECTED --}}

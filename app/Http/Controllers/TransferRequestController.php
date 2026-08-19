@@ -8,6 +8,7 @@ use App\Models\TransferRequest;
 use App\Services\Interfaces\ItemServiceInterface;
 use App\Services\Interfaces\TransferRequestServiceInterface;
 use App\Services\Interfaces\WarehouseServiceInterface;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -46,6 +47,7 @@ class TransferRequestController extends Controller
 
                 return DataTables::of($transferRequests)
                     ->addIndexColumn()
+                    ->addColumn('checkbox',  fn($row) => '<input type="checkbox" class="row-checkbox" value="' . $row->id . '">')
                     ->addColumn('item', fn($row) => $row->item->item_desc)
                     ->addColumn('destination', fn($row) => $row->destinationWarehouse->name)
                     ->addColumn('requested_qty', fn($row) => number_format((float) $row->requested_qty, 2, ',', '.'))
@@ -53,9 +55,13 @@ class TransferRequestController extends Controller
                     ->addColumn('requester', fn($row) => $row->requester->name)
                     ->addColumn('status', fn($row) => $this->statusBadge($row->status))
                     ->addColumn('action', function ($row) {
-                        return '<a href="' . route('transfer-requests.show', $row->id) . '" class="btn btn-sm btn-info">Detail</a>';
+                        $urlCetakSatuan = route('transfer-requests.cetak-batch', ['ids' => [$row->id]]);
+
+                        $buttons = '<a href="' . route('transfer-requests.show', $row->id) . '" class="btn btn-sm btn-info">Detail</a>' .
+                            ' <a href="' . $urlCetakSatuan . '" target="_blank" class="btn btn-sm btn-warning">Cetak</a>';
+                        return $buttons;
                     })
-                    ->rawColumns(['status', 'action'])
+                    ->rawColumns(['status', 'action', 'checkbox'])
                     ->make(true);
             }
 
@@ -64,6 +70,29 @@ class TransferRequestController extends Controller
             Log::error('Gagal menampilkan Permintaan Kirim Barang : ' . $e->getMessage());
             return redirect()->back()->with('error', 'Data Permintaan Kirim Barang  tidak dapat ditampilkan.');
         }
+    }
+
+    public function cetakBatch(Request $request)
+    {
+        $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'exists:transfer_requests,id',
+        ]);
+
+        $transferRequests = TransferRequest::with([
+            'details.itemLocation.item',
+            'destinationWarehouse',
+            'requester',
+        ])->whereIn('id', $request->ids)->get();
+
+        if ($transferRequests->isEmpty()) {
+            return redirect()->back()->with('error', 'Tidak ada data yang dipilih.');
+        }
+
+        $pdf = Pdf::loadView('pdf.ttb-batch', compact('transferRequests'))
+            ->setPaper('letter', 'portrait');
+
+        return $pdf->stream('ttb-batch-' . now()->format('YmdHis') . '.pdf');
     }
 
     public function create()
