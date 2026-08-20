@@ -21,6 +21,8 @@ interface TransactionServiceInterface
      */
     public function create(array $data, int $createdBy);
 
+    public function createBatch(array $entries, int $createdBy): array;
+
     /**
      * Hapus transaksi beserta jejaknya di ledger, lalu recalculate.
      * Hanya PORC yang bisa dihapus.

@@ -48,63 +48,94 @@ class TransactionService implements TransactionServiceInterface
     public function create(array $data, int $createdBy)
     {
         return DB::transaction(function () use ($data, $createdBy) {
-            $item      = $this->itemRepository->getById((int) $data['item_id']);
-            $itemId    = (int) $data['item_id'];
-            $warehouseId = (int) $data['warehouse_id'];
-            $transDate = Carbon::parse($data['trans_date']);
-            $transQty  = (float) $data['trans_qty'];
-            $data['receiving_lot'] = $this->itemLocationService->generateReceivingLot($transDate);
-            $data['exp_date'] = $this->applyExpiryRule($data);
-            $data['exp_by_receiving_at'] = $this->applyExpiryByReceiving($data);
-            // bb_qty = kondisi stok SEKARANG di item_locations, bukan dari
-            // riwayat ledger. Ini "saldo ATM", diambil saat transaksi dibuat,
-            // apapun tanggal transaksinya (termasuk kalau backdate).
-            $bbQty = $this->itemLocationService->getTotalStock($itemId, $warehouseId);
+            return $this->persistTransaction($data, $createdBy);
+        });
+    }
 
-            $data['item_no']   = $item->item_no;
-            $data['item_desc'] = $item->item_desc;
-            $data['item_uom']  = $item->item_uom;
-            $data['status']     = 'NEW';
-            $data['created_by'] = $createdBy;
+    public function createBatch(array $entries, int $createdBy): array
+    {
+        if (empty($entries)) {
+            throw new \Exception("Minimal harus ada 1 transaksi yang diinput.");
+        }
 
-            [$inQty, $outQty] = $this->resolveDirection($data, $transQty);
-            $data['in_qty']  = $inQty;
-            $data['out_qty'] = $outQty;
+        return DB::transaction(function () use ($entries, $createdBy) {
+            $transactions = [];
 
-            // Validasi stok tidak minus — cek terhadap kondisi SEKARANG
-            if ($outQty > $bbQty) {
-                throw new \Exception(
-                    "Stok tidak mencukupi. Stok tersedia: " . number_format($bbQty, 2, ',', '.') .
-                        ", dibutuhkan: " . number_format($outQty, 2, ',', '.')
-                );
+            foreach ($entries as $i => $entryData) {
+                $entryData['doc_type'] = $entryData['doc_type'] ?? Transaction::DOC_PORC;
+
+                try {
+                    $transactions[] = $this->persistTransaction($entryData, $createdBy);
+                } catch (\Exception $e) {
+                    throw new \Exception("Form ke-" . ($i + 1) . ": " . $e->getMessage());
+                }
             }
 
-            $ebQty = $bbQty + $inQty - $outQty;
-
-            $data['bb_qty'] = $bbQty;
-            $data['eb_qty'] = $ebQty;
-
-            $transaction = $this->transactionRepository->create($data);
-
-            // Terapkan perubahan fisik ke item_locations
-            $this->applyStockMovement($transaction, $data, $transDate);
-
-            // Arsip ke ledger — murni catatan riwayat, tidak ada recalculate
-            $this->stockLedgerService->record([
-                'item_id'      => $itemId,
-                'warehouse_id' => $warehouseId,
-                'trans_date'   => $transDate->toDateString(),
-                'in_qty'       => $inQty,
-                'out_qty'      => $outQty,
-                'bb_qty'       => $bbQty,
-                'eb_qty'       => $ebQty,
-                'doc_type'     => $transaction->doc_type,
-                'ref_type'     => StockLedger::REF_TRANSACTION,
-                'ref_id'       => $transaction->id,
-            ]);
-
-            return $transaction->fresh();
+            return $transactions;
         });
+    }
+
+    private function persistTransaction(array $data, int $createdBy)
+    {
+        $item        = $this->itemRepository->getById((int) $data['item_id']);
+        $itemId      = (int) $data['item_id'];
+        $warehouseId = (int) $data['warehouse_id'];
+        $transDate   = Carbon::parse($data['trans_date']);
+        $transQty    = (float) $data['trans_qty'];
+
+        $data['receiving_lot']       = $this->itemLocationService->generateReceivingLot($transDate);
+        $data['exp_date']            = $this->applyExpiryRule($data);
+        $data['exp_by_receiving_at'] = $this->applyExpiryByReceiving($data);
+
+        // bb_qty = kondisi stok SEKARANG di item_locations, diambil real-time.
+        // Karena masih dalam koneksi/transaction DB yang sama, kalau dalam 1 batch
+        // ada 2 form dengan item+gudang yang sama, form kedua akan lihat stok
+        // yang sudah ter-update dari form pertama (bukan snapshot basi).
+        $bbQty = $this->itemLocationService->getTotalStock($itemId, $warehouseId);
+
+        $data['item_no']    = $item->item_no;
+        $data['item_desc']  = $item->item_desc;
+        $data['item_uom']   = $item->item_uom;
+        $data['status']     = 'NEW';
+        $data['created_by'] = $createdBy;
+
+        [$inQty, $outQty] = $this->resolveDirection($data, $transQty);
+        $data['in_qty']  = $inQty;
+        $data['out_qty'] = $outQty;
+
+        if ($outQty > $bbQty) {
+            throw new \Exception(
+                "Stok tidak mencukupi untuk item {$item->item_no}. Stok tersedia: " .
+                    number_format($bbQty, 2, ',', '.') .
+                    ", dibutuhkan: " . number_format($outQty, 2, ',', '.')
+            );
+        }
+
+        $ebQty = $bbQty + $inQty - $outQty;
+
+        $data['bb_qty'] = $bbQty;
+        $data['eb_qty'] = $ebQty;
+
+        $transaction = $this->transactionRepository->create($data);
+
+        // Terapkan perubahan fisik ke item_locations
+        $this->applyStockMovement($transaction, $data, $transDate);
+
+        // Arsip ke ledger — murni catatan riwayat, tidak ada recalculate
+        $this->stockLedgerService->record([
+            'item_id'      => $itemId,
+            'warehouse_id' => $warehouseId,
+            'trans_date'   => $transDate->toDateString(),
+            'in_qty'       => $inQty,
+            'out_qty'      => $outQty,
+            'bb_qty'       => $bbQty,
+            'eb_qty'       => $ebQty,
+            'doc_type'     => $transaction->doc_type,
+            'ref_type'     => StockLedger::REF_TRANSACTION,
+            'ref_id'       => $transaction->id,
+        ]);
+
+        return $transaction->fresh();
     }
 
     public function delete(int $id)
@@ -159,18 +190,18 @@ class TransactionService implements TransactionServiceInterface
         switch ($transaction->doc_type) {
             case Transaction::DOC_PORC:
                 $this->itemLocationService->create([
-                    'item_id'            => $transaction->item_id,
-                    'warehouse_id'       => $transaction->warehouse_id,
-                    'demander_id'        => $data['demander_id'] ?? null,
-                    'vendor_lot'         => $data['vendor_lot'] ?? null,
-                    'receiving_lot'      => $this->itemLocationService->generateReceivingLot($transDate),
-                    'production_date'    => $data['production_date'] ?? null,
-                    'qty_weight'         => $transaction->in_qty,
-                    'qty_unit'           => $data['qty_unit'] ?? null,
-                    'package'            => $data['package'] ?? null,
-                    'received_date'      => $transaction->trans_date,
+                    'item_id'             => $transaction->item_id,
+                    'warehouse_id'        => $transaction->warehouse_id,
+                    'demander_id'         => $data['demander_id'] ?? null,
+                    'vendor_lot'          => $data['vendor_lot'] ?? null,
+                    'receiving_lot'       => $this->itemLocationService->generateReceivingLot($transDate),
+                    'production_date'     => $data['production_date'] ?? null,
+                    'qty_weight'          => $transaction->in_qty,
+                    'qty_unit'            => $data['qty_unit'] ?? null,
+                    'package'             => $data['package'] ?? null,
+                    'received_date'       => $transaction->trans_date,
                     'exp_by_receiving_at' => $data['exp_by_receiving_at'] ?? null,
-                    'is_warehouse_stock' => true,
+                    'is_warehouse_stock'  => true,
                 ]);
                 break;
 
@@ -239,10 +270,10 @@ class TransactionService implements TransactionServiceInterface
         }
     }
 
-    private function applyExpiryRule(array $data): string | null
+    private function applyExpiryRule(array $data): string|null
     {
         if (! empty($data['production_date'])) {
-            $data['exp_date'] = \Carbon\Carbon::parse($data['production_date'])
+            $data['exp_date'] = Carbon::parse($data['production_date'])
                 ->addYear()
                 ->toDateString();
         }
@@ -250,10 +281,10 @@ class TransactionService implements TransactionServiceInterface
         return $data['exp_date'] ?? null;
     }
 
-    private function applyExpiryByReceiving(array $data): string | null
+    private function applyExpiryByReceiving(array $data): string|null
     {
         if (! empty($data['trans_date'])) {
-            $data['exp_by_receiving_at'] = \Carbon\Carbon::parse($data['trans_date'])
+            $data['exp_by_receiving_at'] = Carbon::parse($data['trans_date'])
                 ->addYear()
                 ->toDateString();
         }

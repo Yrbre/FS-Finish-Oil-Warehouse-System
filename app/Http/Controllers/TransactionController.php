@@ -120,12 +120,12 @@ class TransactionController extends Controller
 
     public function storePorc(PorcTransactionRequest $request)
     {
+        $validated = $request->validated();
         try {
-            $data = $request->validated();
-            $data['doc_type'] = Transaction::DOC_PORC;
-
-            $this->transactionService->create($data, auth()->id());
-
+            $transactions = $this->transactionService->createBatch(
+                $validated['entries'],
+                auth()->id()
+            );
             return redirect()->route('transactions.index')
                 ->with('success', 'Supply oil (pemasukan) berhasil disimpan.');
         } catch (\Exception $e) {

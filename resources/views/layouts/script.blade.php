@@ -34,9 +34,11 @@
 
 <script>
     (function($) {
-        function initSelect2() {
-            // Inisialisasi SEMUA elemen .select2 yang belum di-init
-            $('.select2, .select2-multi').each(function() {
+        function initSelect2($scope) {
+            // Kalau $scope tidak diberikan, default ke seluruh dokumen (perilaku lama)
+            const $context = $scope && $scope.length ? $scope : $(document);
+
+            $context.find('.select2, .select2-multi').each(function() {
                 if ($(this).data('select2')) {
                     return; // sudah pernah di-init, skip
                 }
@@ -48,6 +50,8 @@
                 });
             });
         }
+
+        window.initSelect2 = initSelect2;
 
         function refreshSelect2Width() {
             $('.select2, .select2-multi').each(function() {
