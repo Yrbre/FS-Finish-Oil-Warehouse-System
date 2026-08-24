@@ -33,6 +33,12 @@ return new class extends Migration
             $table->decimal('qty_package', 15, 2);
             $table->decimal('qty_weight', 15, 2);
 
+            // Berat saat lot pertama kali dibuat. Tidak pernah berubah
+            // kecuali PORC-nya diedit. Dipakai untuk mendeteksi apakah
+            // lot sudah tersentuh mutasi (transfer/CONS/ADJ) — kalau
+            // sudah, qty PORC tidak boleh diubah lagi.
+            $table->decimal('initial_weight', 15, 2);
+
             $table->string('package')->nullable();
             $table->string('type')->nullable();
             $table->date('received_date')->nullable();

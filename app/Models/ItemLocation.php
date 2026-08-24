@@ -23,6 +23,7 @@ class ItemLocation extends Model
         'qty_perpackage',
         'qty_package',
         'qty_weight',
+        'initial_weight',
         'package',
         'type',
         'received_date',
@@ -42,6 +43,7 @@ class ItemLocation extends Model
         'qty_perpackage'      => 'decimal:4',
         'qty_package'         => 'decimal:2',
         'qty_weight'          => 'decimal:2',
+        'initial_weight' => 'decimal:2',
         'is_warehouse_stock'  => 'boolean',
     ];
 
@@ -114,5 +116,23 @@ class ItemLocation extends Model
     public function scopeOfPackageSize(Builder $query, float $perPackage): Builder
     {
         return $query->where('qty_perpackage', $perPackage);
+    }
+
+    /**
+     * Lot sudah pernah dimutasi (transfer keluar, CONS, atau ADJ).
+     * Kalau sudah, qty PORC-nya tidak boleh diedit lagi — koreksi
+     * selisih setelah ini adalah urusan ADJ.
+     */
+    public function isTouched(): bool
+    {
+        return (float) $this->qty_weight !== (float) $this->initial_weight;
+    }
+
+    /**
+     * Berapa kg sudah keluar dari lot ini.
+     */
+    public function getConsumedWeightAttribute(): float
+    {
+        return round((float) $this->initial_weight - (float) $this->qty_weight, 2);
     }
 }

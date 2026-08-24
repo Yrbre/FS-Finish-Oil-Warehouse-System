@@ -2,59 +2,69 @@
 
 namespace App\Repositories\Interfaces;
 
+use Illuminate\Support\Collection;
+
 interface ItemLocationRepositoryInterface
 {
     public function getAll();
+
     public function getById(int $id);
+
     public function create(array $data);
+
     public function update(int $id, array $data);
+
     public function delete(int $id);
-    /**
-     * Total stok (qty_weight) 1 item di 1 warehouse.
-     */
-    public function getTotalStock(int $itemId, int $warehouseId): float;
 
+    /* ---------------- Stok ---------------- */
 
-    public function getTotalStockByDepartment(int | null $itemId, int $departmentId): float;
     /**
-     * Total stok 1 item di seluruh warehouse.
+     * Total stok. $demanderId wajib diisi kalau ingin stok milik
+     * department tertentu — tanpa itu, hasilnya stok seluruh
+     * department yang ada di gudang tersebut.
      */
+    public function getTotalStock(int $itemId, int $warehouseId, ?int $demanderId = null): float;
+
+    public function getTotalStockByDepartment(?int $itemId, int $departmentId): float;
+
     public function getTotalStockAllWarehouses(int $itemId): float;
 
     /**
-     * Lot yang masih ada stoknya di 1 warehouse, urut FEFO.
-     * Dipakai untuk transaksi CONS.
+     * Total stok milik satu department, lintas gudang.
+     * Dipakai untuk pengecekan min-stock.
      */
-    public function getFefoLots(int $itemId, int $warehouseId);
+    public function getTotalStockByDemander(int $itemId, int $demanderId, ?array $warehouseIds = null): float;
+
+    /* ---------------- FEFO ---------------- */
 
     /**
-     * Lot aktif untuk 1 item, dibatasi HANYA pada warehouse_id yang ada
-     * di $warehouseIds (whitelist), urut FEFO.
-     * Dipakai untuk rekomendasi Transfer — sumbernya cuma boleh dari
-     * gudang-gudang tertentu (misal semua gudang milik department IMC).
+     * Lot untuk TRANSFER: di gudang IMC, milik department pemohon,
+     * ukuran kemasan cocok persis, terurut FEFO.
      */
-    public function getFefoLotsAcrossWarehouses(int $itemId, array $warehouseIds);
+    public function getFefoLotsForTransfer(
+        int $itemId,
+        int $demanderId,
+        array $warehouseIds,
+        float $perPackage
+    ): Collection;
 
     /**
-     * Cari lot dengan vendor_lot & exp_date yang sama di warehouse tertentu.
-     * Dipakai saat barang transfer diterima — kalau lot sudah ada,
-     * qty ditambahkan; kalau belum, buat record baru.
+     * Lot untuk CONS: di gudang staff, milik department pemakai,
+     * semua ukuran kemasan, terurut FEFO.
      */
-    public function findMatchingLot(int $itemId, int $warehouseId, ?string $vendorLot, ?string $expDate);
+    public function getFefoLotsForCons(int $itemId, int $warehouseId, int $demanderId): Collection;
 
-    // REPORT
     /**
-     * Total stok SELURUH item di SELURUH warehouse (widget dashboard).
+     * Daftar ukuran kemasan yang tersedia — untuk dropdown
+     * di form transfer request.
      */
+    public function getAvailablePackageSizes(int $itemId, int $demanderId, array $warehouseIds): Collection;
+
+    /* ---------------- Report ---------------- */
+
     public function getGrandTotalStock(): float;
 
-    /**
-     * Lot yang akan expired dalam N hari ke depan, urut paling dekat dulu.
-     * Hanya lot yang masih ada stoknya.
-     */
     public function getNearExpiring(int $days = 30, int $limit = 10);
-    /**
-     * Ringkasan total stok per warehouse (untuk laporan).
-     */
+
     public function getStockSummaryByWarehouse();
 }

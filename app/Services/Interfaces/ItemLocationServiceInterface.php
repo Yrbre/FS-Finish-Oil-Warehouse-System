@@ -2,65 +2,66 @@
 
 namespace App\Services\Interfaces;
 
+use App\Models\ItemLocation;
+use App\Services\Dto\AllocationResult;
+use Illuminate\Support\Collection;
+
 interface ItemLocationServiceInterface
 {
     public function getAll();
+
     public function getById(int $id);
+
     public function create(array $data);
+
     public function update(int $id, array $data);
+
     public function delete(int $id);
 
-    public function getTotalStock(int $itemId, int $warehouseId): float;
+    /* ---------------- Stok ---------------- */
+
+    public function getTotalStock(int $itemId, int $warehouseId, ?int $demanderId = null): float;
+
+    public function getTotalStockByDepartment(?int $itemId, int $departmentId): float;
+
     public function getTotalStockAllWarehouses(int $itemId): float;
-    public function getTotalStockByDepartment(int | null $itemId, int $departmentId): float;
 
-    /**
-     * Alokasi FEFO dalam 1 warehouse. Throw Exception kalau stok kurang.
-     *
-     * Return: array of [
-     *   'item_location' => ItemLocation,
-     *   'qty_to_take'   => float,
-     * ]
-     */
-    public function allocateFefo(int $itemId, int $warehouseId, float $qtyNeeded): array;
+    public function getTotalStockByDemander(int $itemId, int $demanderId, ?array $warehouseIds = null): float;
 
-    /**
-     * Alokasi FEFO lintas seluruh warehouse (untuk Transfer).
-     * TIDAK throw exception kalau kurang — sisa kebutuhan dikembalikan
-     * lewat parameter referensi $remainingQty, supaya pemanggil bisa
-     * menampilkan rekomendasi parsial ke user.
-     */
-    public function allocateFefoAcrossWarehouses(
+    /* ---------------- Alokasi ---------------- */
+
+    /** TRANSFER: package utuh, ukuran cocok persis. */
+    public function allocateForTransfer(
         int $itemId,
-        float $qtyNeeded,
+        int $demanderId,
         array $warehouseIds,
-        float &$remainingQty
-    ): array;
+        float $perPackage,
+        float $packageNeeded
+    ): AllocationResult;
 
-    /**
-     * Kurangi stok sejumlah tertentu dari 1 lot.
-     */
-    public function deductLot(int $itemLocationId, float $qty);
+    /** CONS: potong kg, lintas ukuran kemasan. */
+    public function allocateForCons(
+        int $itemId,
+        int $warehouseId,
+        int $demanderId,
+        float $weightNeeded
+    ): AllocationResult;
 
-    /**
-     * Tambah stok ke gudang tujuan. Kalau lot dengan vendor_lot &
-     * exp_date yang sama sudah ada, qty ditambahkan ke lot itu.
-     * Kalau belum ada, dibuat record baru.
-     */
-    public function addOrMergeLot(int $itemId, int $warehouseId, array $lotData);
+    public function getAvailablePackageSizes(int $itemId, int $demanderId, array $warehouseIds): Collection;
 
-    // Report
-    public function getGrandTotalStock(): float;
-    public function getNearExpiring(int $days = 30, int $limit = 10);
-    public function getStockSummaryByWarehouse();
+    /* ---------------- Mutasi lot ---------------- */
 
-    /**
-     * Semua lot yang masih ada stok di warehouse_id tertentu, urut FEFO,
-     * TANPA dipotong sesuai kebutuhan qty (beda dari allocateFefoAcrossWarehouses
-     * yang berhenti begitu qty terpenuhi). Dipakai untuk tampilkan pilihan
-     * lengkap ke user supaya bisa pilih manual, bukan cuma ikut saran FEFO.
-     */
-    public function getAvailableLotsAcrossWarehouses(int $itemId, array $warehouseIds);
+    public function deductLot(int $itemLocationId, float $qtyWeight): ItemLocation;
+
+    public function addLot(array $lotData): ItemLocation;
 
     public function generateReceivingLot($receivingDate);
+
+    /* ---------------- Report ---------------- */
+
+    public function getGrandTotalStock(): float;
+
+    public function getNearExpiring(int $days = 30, int $limit = 10);
+
+    public function getStockSummaryByWarehouse();
 }

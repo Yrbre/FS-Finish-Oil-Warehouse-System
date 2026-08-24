@@ -4,18 +4,18 @@ namespace App\Services;
 
 use App\Models\ItemLocation;
 use App\Repositories\Interfaces\ItemLocationRepositoryInterface;
+use App\Services\Dto\AllocationResult;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ItemLocationService implements ItemLocationServiceInterface
 {
-    protected ItemLocationRepositoryInterface $itemLocationRepository;
-
-    public function __construct(ItemLocationRepositoryInterface $itemLocationRepository)
-    {
-        $this->itemLocationRepository = $itemLocationRepository;
-    }
+    public function __construct(
+        protected ItemLocationRepositoryInterface $itemLocationRepository,
+        protected PackageAllocator $allocator,
+    ) {}
 
     public function getAll()
     {
@@ -29,17 +29,16 @@ class ItemLocationService implements ItemLocationServiceInterface
 
     public function create(array $data)
     {
-        $data = $this->applyExpiryRule($data);
-
+        $data = $this->prepareLotData($data);
 
         return $this->itemLocationRepository->create($data);
     }
 
     public function update(int $id, array $data)
     {
-        $data = $this->applyExpiryRule($data);
-
-
+        // Sengaja TIDAK memanggil prepareLotData: kalau exp_date
+        // dihitung ulang setiap update, tanggal yang sudah dikoreksi
+        // manual akan tertimpa diam-diam.
         return $this->itemLocationRepository->update($id, $data);
     }
 
@@ -48,12 +47,14 @@ class ItemLocationService implements ItemLocationServiceInterface
         return $this->itemLocationRepository->delete($id);
     }
 
-    public function getTotalStock(int $itemId, int $warehouseId): float
+    /* ================= STOK ================= */
+
+    public function getTotalStock(int $itemId, int $warehouseId, ?int $demanderId = null): float
     {
-        return $this->itemLocationRepository->getTotalStock($itemId, $warehouseId);
+        return $this->itemLocationRepository->getTotalStock($itemId, $warehouseId, $demanderId);
     }
 
-    public function getTotalStockByDepartment(int | null $itemId, int $departmentId): float
+    public function getTotalStockByDepartment(?int $itemId, int $departmentId): float
     {
         return $this->itemLocationRepository->getTotalStockByDepartment($itemId, $departmentId);
     }
@@ -62,6 +63,132 @@ class ItemLocationService implements ItemLocationServiceInterface
     {
         return $this->itemLocationRepository->getTotalStockAllWarehouses($itemId);
     }
+
+    public function getTotalStockByDemander(int $itemId, int $demanderId, ?array $warehouseIds = null): float
+    {
+        return $this->itemLocationRepository->getTotalStockByDemander($itemId, $demanderId, $warehouseIds);
+    }
+
+    /* ================= ALOKASI ================= */
+
+    /**
+     * Tidak melempar exception saat stok kurang — hasilnya dikembalikan
+     * apa adanya lewat AllocationResult supaya pemanggil bisa
+     * menampilkan "kurang berapa" ke approver.
+     */
+    public function allocateForTransfer(
+        int $itemId,
+        int $demanderId,
+        array $warehouseIds,
+        float $perPackage,
+        float $packageNeeded
+    ): AllocationResult {
+        $lots = $this->itemLocationRepository->getFefoLotsForTransfer(
+            $itemId,
+            $demanderId,
+            $warehouseIds,
+            $perPackage
+        );
+
+        return $this->allocator->allocateByPackage($lots, $packageNeeded);
+    }
+
+    public function allocateForCons(
+        int $itemId,
+        int $warehouseId,
+        int $demanderId,
+        float $weightNeeded
+    ): AllocationResult {
+        $lots = $this->itemLocationRepository->getFefoLotsForCons(
+            $itemId,
+            $warehouseId,
+            $demanderId
+        );
+
+        return $this->allocator->allocateByWeight($lots, $weightNeeded);
+    }
+
+    public function getAvailablePackageSizes(int $itemId, int $demanderId, array $warehouseIds): Collection
+    {
+        return $this->itemLocationRepository->getAvailablePackageSizes($itemId, $demanderId, $warehouseIds);
+    }
+
+    /* ================= MUTASI LOT ================= */
+
+    /**
+     * Potong berat dari sebuah lot.
+     *
+     * qty_package TIDAK disentuh — jumlah package selalu dihitung
+     * ulang dari berat lewat accessor qty_package_display. Kalau
+     * ikut dikurangi di sini, galat pembulatan akan menumpuk tiap
+     * kali CONS terjadi.
+     */
+    public function deductLot(int $itemLocationId, float $qtyWeight): ItemLocation
+    {
+        $lot = $this->itemLocationRepository->getById($itemLocationId);
+
+        $newWeight = round((float) $lot->qty_weight - $qtyWeight, 2);
+
+        if ($newWeight < 0) {
+            throw new \Exception(
+                "Pengurangan melebihi stok lot " . ($lot->receiving_lot ?? $lot->vendor_lot ?? "#{$lot->id}") .
+                    ". Stok tersedia: " . number_format((float) $lot->qty_weight, 2, ',', '.') . " kg."
+            );
+        }
+
+        return $this->itemLocationRepository->update($itemLocationId, [
+            'qty_weight' => $newWeight,
+        ]);
+    }
+
+    /**
+     * Buat lot baru. Menggantikan addOrMergeLot() — lot hasil transfer
+     * TIDAK PERNAH digabung dengan lot lama, supaya jejak tiap
+     * pengiriman tetap terlihat dan FEFO di gudang tujuan tidak kabur.
+     */
+    public function addLot(array $lotData): ItemLocation
+    {
+        $perPackage = (float) ($lotData['qty_perpackage'] ?? 0);
+        $package    = (float) ($lotData['qty_package'] ?? 0);
+
+        if ($perPackage <= 0) {
+            throw new \Exception("Ukuran per package harus lebih dari 0.");
+        }
+
+        if ($package <= 0) {
+            throw new \Exception("Jumlah package harus lebih dari 0.");
+        }
+
+        // Berat SELALU hasil perkalian — tidak pernah diisi bebas.
+        $lotData['qty_weight'] = round($perPackage * $package, 2);
+
+        // Snapshot berat awal, jadi penanda lot masih utuh.
+        $lotData['initial_weight'] = $lotData['qty_weight'];
+
+        return $this->create($lotData);
+    }
+
+    public function generateReceivingLot($receivingDate)
+    {
+        $prefix = 'TFCO-';
+        $date   = Carbon::parse($receivingDate)->format('ymd');
+
+        return DB::transaction(function () use ($prefix, $date) {
+            $lastRecord = ItemLocation::withTrashed()
+                ->where('receiving_lot', 'like', $prefix . $date . '%')
+                ->orderBy('receiving_lot', 'desc')
+                ->lockForUpdate()
+                ->first();
+
+            $newNumber = $lastRecord
+                ? ((int) substr($lastRecord->receiving_lot, strlen($prefix . $date))) + 1
+                : 1;
+
+            return $prefix . $date . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
+        });
+    }
+
+    /* ================= REPORT ================= */
 
     public function getGrandTotalStock(): float
     {
@@ -78,135 +205,30 @@ class ItemLocationService implements ItemLocationServiceInterface
         return $this->itemLocationRepository->getStockSummaryByWarehouse();
     }
 
-    public function allocateFefo(int $itemId, int $warehouseId, float $qtyNeeded): array
+    /* ================= PRIVATE ================= */
+
+    /**
+     * Isi exp_date HANYA kalau masih kosong.
+     *
+     * Versi lama selalu menimpa dengan production_date + 1 tahun.
+     * Akibatnya lot yang exp-nya diinput manual (beda dari aturan
+     * umum) akan berubah diam-diam, termasuk saat lot dipindahkan
+     * lewat transfer.
+     */
+    private function prepareLotData(array $data): array
     {
-        $lots = $this->itemLocationRepository->getFefoLots($itemId, $warehouseId);
-
-        $allocation = $this->buildAllocation($lots, $qtyNeeded, $remaining);
-
-        if ($remaining > 0) {
-            throw new \Exception(
-                "Stok tidak mencukupi. Kurang: " . $remaining . " unit."
-            );
+        if (empty($data['exp_date']) && ! empty($data['production_date'])) {
+            $data['exp_date'] = Carbon::parse($data['production_date'])
+                ->addYear()
+                ->toDateString();
         }
 
-        return $allocation;
-    }
-
-    public function allocateFefoAcrossWarehouses(
-        int $itemId,
-        float $qtyNeeded,
-        array $warehouseIds,
-        float &$remainingQty
-    ): array {
-        $lots = $this->itemLocationRepository
-            ->getFefoLotsAcrossWarehouses($itemId, $warehouseIds);
-
-        $allocation = $this->buildAllocation($lots, $qtyNeeded, $remaining);
-
-        $remainingQty = $remaining;
-
-        return $allocation;
-    }
-
-    public function deductLot(int $itemLocationId, float $qty)
-    {
-        $lot = $this->itemLocationRepository->getById($itemLocationId);
-
-        $newQty = (float) $lot->qty_weight - $qty;
-
-        if ($newQty < 0) {
-            throw new \Exception(
-                "Pengurangan melebihi stok lot " . ($lot->vendor_lot ?? '-') . ". " .
-                    "Stok tersedia: " . number_format((float) $lot->qty_weight, 2, ',', '.')
-            );
-        }
-
-        return $this->itemLocationRepository->update($itemLocationId, [
-            'qty_weight' => $newQty,
-        ]);
-    }
-
-    public function addOrMergeLot(int $itemId, int $warehouseId, array $lotData)
-    {
-        $existing = $this->itemLocationRepository->findMatchingLot(
-            $itemId,
-            $warehouseId,
-            $lotData['vendor_lot'] ?? null,
-            $lotData['exp_date'] ?? null
-        );
-
-        if ($existing) {
-            return $this->itemLocationRepository->update($existing->id, [
-                'qty_weight' => (float) $existing->qty_weight + (float) $lotData['qty_weight'],
-                'qty_unit'   => (float) $existing->qty_unit + (float) ($lotData['qty_unit'] ?? 0),
-            ]);
-        }
-
-        return $this->itemLocationRepository->create(array_merge($lotData, [
-            'item_id'            => $itemId,
-            'warehouse_id'       => $warehouseId,
-            'is_warehouse_stock' => true,
-        ]));
-    }
-
-    public function getAvailableLotsAcrossWarehouses(int $itemId, array $warehouseIds)
-    {
-        return $this->itemLocationRepository->getFefoLotsAcrossWarehouses($itemId, $warehouseIds);
-    }
-
-    private function applyExpiryRule(array $data): array
-    {
-        if (! empty($data['production_date'])) {
-            $data['exp_date'] = \Carbon\Carbon::parse($data['production_date'])
+        if (empty($data['exp_by_receiving_at']) && ! empty($data['received_date'])) {
+            $data['exp_by_receiving_at'] = Carbon::parse($data['received_date'])
                 ->addYear()
                 ->toDateString();
         }
 
         return $data;
-    }
-
-    private function buildAllocation($lots, float $qtyNeeded, ?float &$remaining): array
-    {
-        $remaining  = $qtyNeeded;
-        $allocation = [];
-
-        foreach ($lots as $lot) {
-            if ($remaining <= 0) {
-                break;
-            }
-
-            $take = min((float) $lot->qty_weight, $remaining);
-
-            $allocation[] = [
-                'item_location' => $lot,
-                'qty_to_take'   => $take,
-            ];
-
-            $remaining -= $take;
-        }
-
-        return $allocation;
-    }
-
-    public function generateReceivingLot($receivingDate)
-    {
-        $prefix = 'TFCO-';
-        $receivingDate = Carbon::parse($receivingDate)->format('ymd');
-
-        return DB::transaction(function () use ($prefix, $receivingDate) {
-            $lastRecord = ItemLocation::withTrashed()
-                ->where('receiving_lot', 'like', $prefix . $receivingDate . '%')
-                ->orderBy('receiving_lot', 'desc')
-                ->lockForUpdate()
-                ->first();
-
-
-            $newNumber = $lastRecord
-                ? ((int) substr($lastRecord->receiving_lot, strlen($prefix . $receivingDate))) + 1
-                : 1;
-
-            return $prefix . $receivingDate . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
-        });
     }
 }
