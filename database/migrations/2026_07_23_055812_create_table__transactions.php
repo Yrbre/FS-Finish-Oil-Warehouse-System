@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('item_id')->constrained('items')->cascadeOnDelete();
             $table->foreignId('warehouse_id')->constrained('warehouses')->cascadeOnDelete();
+            $table->foreignId('demander_id')->nullable()->constrained('departments')->nullOnDelete();
             $table->string('doc_type');
             $table->string('adj_type')->nullable();
             $table->date('trans_date')->index();

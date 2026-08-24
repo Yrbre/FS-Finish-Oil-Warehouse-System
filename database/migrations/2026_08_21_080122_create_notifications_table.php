@@ -11,8 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('item_locations', function (Blueprint $table) {
-            $table->date('exp_by_receiving_at')->nullable()->after('received_date');
+        Schema::create('notifications', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('type');
+            $table->morphs('notifiable');
+            $table->text('data');
+            $table->timestamp('read_at')->nullable();
+            $table->timestamps();
         });
     }
 
@@ -21,8 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('item_locations', function (Blueprint $table) {
-            $table->dropColumn('exp_by_receiving_at');
-        });
+        Schema::dropIfExists('notifications');
     }
 };
