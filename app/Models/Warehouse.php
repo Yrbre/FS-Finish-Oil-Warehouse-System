@@ -35,4 +35,9 @@ class Warehouse extends Model
     {
         return $this->hasMany(TransferRequest::class, 'destination_warehouse_id');
     }
+
+    public function isImc(): bool
+    {
+        return $this->department?->code === Department::IMC_CODE;
+    }
 }

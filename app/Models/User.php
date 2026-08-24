@@ -55,8 +55,14 @@ class User extends Authenticatable
         $this->syncRoles([$roleName]);
     }
 
-    public function isTransferApprover()
+    /** Relasi supaya bisa eager load — versi lama 1 query per baris. */
+    public function transferApprover()
     {
-        return TransferApprover::where('user_id', $this->id)->exists();
+        return $this->hasOne(TransferApprover::class);
+    }
+
+    public function isTransferApprover(): bool
+    {
+        return $this->transferApprover()->exists();
     }
 }

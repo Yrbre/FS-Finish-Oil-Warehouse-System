@@ -31,6 +31,8 @@ class TransferRequest extends Model
     protected $fillable = [
         'transfer_code',
         'item_id',
+        'requested_perpackage',
+        'requested_package',
         'requested_qty',
         'destination_warehouse_id',
         'department_id',
@@ -41,6 +43,11 @@ class TransferRequest extends Model
         'approved_by',
         'approved_at',
         'approved_date',
+        'surat_jalan_number',
+        'surat_jalan_date',
+        'shipped_at',
+        'shipped_by',
+        'print_count',
         'received_by',
         'received_at',
         'received_date',
@@ -52,14 +59,19 @@ class TransferRequest extends Model
     ];
 
     protected $casts = [
-        'requested_qty' => 'decimal:2',
-        'expected_date' => 'date',
-        'approved_date' => 'date',
-        'received_date' => 'date',
-        'approved_at'   => 'datetime',
-        'received_at'   => 'datetime',
-        'rejected_at'   => 'datetime',
-        'cancelled_at'  => 'datetime',
+        'requested_perpackage' => 'decimal:4',
+        'requested_package'    => 'decimal:2',
+        'requested_qty'        => 'decimal:2',
+        'expected_date'        => 'date',
+        'approved_date'        => 'date',
+        'surat_jalan_date'     => 'date',
+        'received_date'        => 'date',
+        'approved_at'          => 'datetime',
+        'shipped_at'           => 'datetime',
+        'received_at'          => 'datetime',
+        'rejected_at'          => 'datetime',
+        'cancelled_at'         => 'datetime',
+        'print_count'          => 'integer',
     ];
 
     public function item()
@@ -114,6 +126,30 @@ class TransferRequest extends Model
     public function isCancellable(): bool
     {
         return $this->status === self::STATUS_NEW;
+    }
+
+    /**
+     * Surat jalan hanya bisa dicetak setelah approve. Cetak pertama → in_transit.
+     */
+    public function isShippable(): bool
+    {
+        return $this->status === self::STATUS_APPROVED;
+    }
+
+    public function isReceivable(): bool
+    {
+        return $this->status === self::STATUS_IN_TRANSIT;
+    }
+
+    /** Sudah pernah dicetak — cetak berikutnya tidak mengubah status. */
+    public function isPrinted(): bool
+    {
+        return (int) $this->print_count > 0;
+    }
+
+    public function shipper()
+    {
+        return $this->belongsTo(User::class, 'shipped_by');
     }
 
     /**

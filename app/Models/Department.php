@@ -10,6 +10,13 @@ class Department extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const CODE_IMC = 'IMC';
+
+    public function isImc(): bool
+    {
+        return $this->code === self::CODE_IMC;
+    }
+
     protected $fillable = [
         'name',
         'code',

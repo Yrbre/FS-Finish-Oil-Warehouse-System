@@ -15,6 +15,11 @@ class Item extends Model
         'item_desc',
         'item_uom',
         'item_glclass',
+        'min_stock',
+    ];
+
+    protected $casts = [
+        'min_stock' => 'decimal:2',
     ];
 
     public function itemLocations()
@@ -27,8 +32,13 @@ class Item extends Model
         return $this->hasMany(Transaction::class);
     }
 
-    public function stockLadgers()
+    public function stockLedgers()
     {
         return $this->hasMany(StockLedger::class);
+    }
+
+    public function isMonitored(): bool
+    {
+        return $this->min_stock !== null && (float) $this->min_stock > 0;
     }
 }

@@ -14,19 +14,22 @@ class TransferRequestDetail extends Model
         'item_location_id',
         'source_warehouse_id',
         'vendor_lot',
+        'receiving_lot',
         'exp_date',
         'production_date',
         'package',
+        'qty_perpackage',
+        'package_taken',
         'qty_taken',
-        'qty_unit',
         'dest_item_location_id',
     ];
 
     protected $casts = [
         'exp_date'        => 'date',
         'production_date' => 'date',
+        'qty_perpackage'  => 'decimal:4',
+        'package_taken'   => 'decimal:2',
         'qty_taken'       => 'decimal:2',
-        'qty_unit'        => 'decimal:2',
     ];
 
     public function transferRequest()
