@@ -95,4 +95,12 @@ class StockLedgerRepository implements StockLedgerRepositoryInterface
             ->get()
             ->keyBy(fn($row) => Carbon::parse($row->trans_date)->format('Y-m-d'));
     }
+
+    public function updateByRef(string $refType, int $refId, array $data): int
+    {
+        return $this->model
+            ->where('ref_type', $refType)
+            ->where('ref_id', $refId)
+            ->update($data);
+    }
 }

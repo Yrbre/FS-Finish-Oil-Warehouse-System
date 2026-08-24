@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\AdjTransactionRequest;
 use App\Http\Requests\ConsTransactionRequest;
 use App\Http\Requests\PorcTransactionRequest;
+use App\Http\Requests\PorcUpdateRequest;
 use App\Models\Transaction;
 use App\Services\Interfaces\DepartmentServiceInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
@@ -86,13 +87,23 @@ class TransactionController extends Controller
                     ->addColumn('out_qty', fn($row) => (float) $row->out_qty > 0 ? number_format((float) $row->out_qty, 2, ',', '.') : '-')
                     ->addColumn('created_by', fn($row) => $row->creator->name ?? '-')
                     ->addColumn('action', function ($row) {
-                        // Hanya PORC yang bisa dihapus, dan hanya untuk yang punya permission-nya
-                        if ($row->doc_type !== Transaction::DOC_PORC || ! auth()->user()->can('transactions.porc.delete')) {
+                        if ($row->doc_type !== Transaction::DOC_PORC) {
                             return '<span class="text-muted">-</span>';
                         }
-                        return '<button type="button" class="btn btn-sm btn-danger btn-delete"
+
+                        $btns = '';
+
+                        if (auth()->user()->can('transactions.porc.update')) {
+                            $btns .= '<a href="' . route('transactions.porc.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                        }
+
+                        if (auth()->user()->can('transactions.porc.delete')) {
+                            $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-delete"
                                     data-name="' . e($row->item_desc) . '"
                                     data-url="' . route('transactions.destroy', $row->id) . '">Hapus</button>';
+                        }
+
+                        return $btns ?: '<span class="text-muted">-</span>';
                     })
                     ->rawColumns(['action'])
                     ->make(true);
@@ -112,24 +123,72 @@ class TransactionController extends Controller
      ===================================================================== */
     public function createPorc()
     {
-        $items      = $this->itemService->getAll()->get();
-        $warehouses = $this->warehouseService->getAll()->get();
+        $items       = $this->itemService->getAll()->get();
         $departments = $this->departmentService->getAll()->get();
+
+        // PORC hanya boleh masuk gudang IMC — gudang lain tidak
+        // ditampilkan supaya operator tidak salah pilih lalu ditolak
+        // saat submit.
+        $warehouses = $this->warehouseService->getAll()
+            ->whereHas('department', fn($q) => $q->where('code', \App\Models\Department::CODE_IMC))
+            ->get();
+
         return view('pages.transactions.porc', compact('items', 'warehouses', 'departments'));
     }
 
     public function storePorc(PorcTransactionRequest $request)
     {
-        $validated = $request->validated();
         try {
-            $transactions = $this->transactionService->createBatch(
-                $validated['entries'],
+            $this->transactionService->createBatch(
+                $request->validated()['entries'],
                 auth()->id()
             );
+
             return redirect()->route('transactions.index')
                 ->with('success', 'Supply oil (pemasukan) berhasil disimpan.');
         } catch (\Exception $e) {
             Log::error('Gagal menyimpan PORC: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', $e->getMessage())->withInput();
+        }
+    }
+
+    public function editPorc(string $id)
+    {
+        try {
+            $transaction = $this->transactionService->getById((int) $id);
+
+            if ($transaction->doc_type !== Transaction::DOC_PORC) {
+                throw new \Exception("Hanya transaksi Supply Oil (PORC) yang dapat diedit.");
+            }
+
+            // Lot dicari lewat receiving_lot karena nomor itu unik
+            // per penerimaan — vendor_lot bisa sama di beberapa PORC.
+            $lot = \App\Models\ItemLocation::where('receiving_lot', $transaction->receiving_lot)
+                ->where('item_id', $transaction->item_id)
+                ->where('warehouse_id', $transaction->warehouse_id)
+                ->first();
+
+            if (! $lot) {
+                throw new \Exception("Lot dari transaksi ini sudah tidak ditemukan.");
+            }
+
+            return view('pages.transactions.porc_edit', compact('transaction', 'lot'));
+        } catch (\Exception $e) {
+            Log::error('Gagal membuka form edit PORC: ' . $e->getMessage());
+            return redirect()->route('transactions.index')->with('error', $e->getMessage());
+        }
+    }
+
+    public function updatePorc(PorcUpdateRequest $request, string $id)
+    {
+        try {
+            $this->transactionService->updatePorc((int) $id, $request->validated(), auth()->id());
+
+            return redirect()->route('transactions.index')
+                ->with('success', 'Transaksi Supply Oil berhasil diperbarui.');
+        } catch (\Exception $e) {
+            Log::error('Gagal memperbarui PORC: ' . $e->getMessage());
             return redirect()->back()->with('error', $e->getMessage())->withInput();
         }
     }
@@ -139,14 +198,19 @@ class TransactionController extends Controller
      ===================================================================== */
     public function createCons()
     {
-        $items      = $this->itemService->getAll()->get();
-        if (auth()->user()->hasRole('admin')) {
-            $warehouses = $this->warehouseService->getAll()->get();
-        } else {
-            $warehouses = $this->warehouseService->getByDepartment(auth()->user()->department_id);
-        }
+        $items = $this->itemService->getAll()->get();
 
-        return view('pages.transactions.cons', compact('items', 'warehouses'));
+        // CONS hanya sah di gudang department — gudang IMC dikecualikan
+        // supaya operator tidak salah pilih lalu ditolak guardZone().
+        $warehouses = $this->warehouseService->getAll()
+            ->whereHas('department', fn($q) => $q->where('code', '!=', \App\Models\Department::CODE_IMC))
+            ->when(
+                ! auth()->user()->hasRole('admin'),
+                fn($q) => $q->where('department_id', auth()->user()->department_id)
+            )
+            ->get();
+
+        return view('pages.transactions.cons', compact('warehouses', 'items'));
     }
 
     public function storeCons(ConsTransactionRequest $request)
@@ -155,12 +219,22 @@ class TransactionController extends Controller
             $data = $request->validated();
             $data['doc_type'] = Transaction::DOC_CONS;
 
+            // Pemilik stok = department user yang login. Tidak diambil
+            // dari form supaya stok department lain tidak bisa dipakai
+            // dengan mengubah nilai input.
+            $data['demander_id'] = auth()->user()->department_id;
+
+            if (! $data['demander_id']) {
+                throw new \Exception("Akun Anda belum terdaftar di department manapun.");
+            }
+
             $this->transactionService->create($data, auth()->id());
 
             return redirect()->route('transactions.index')
                 ->with('success', 'Pemakaian (pengeluaran) berhasil disimpan.');
         } catch (\Exception $e) {
             Log::error('Gagal menyimpan CONS: ' . $e->getMessage());
+
             return redirect()->back()->with('error', $e->getMessage())->withInput();
         }
     }
@@ -218,8 +292,15 @@ class TransactionController extends Controller
             'warehouse_id' => ['required', 'exists:warehouses,id'],
         ]);
 
-        $item  = $this->itemService->getById((int) $request->item_id);
-        $stock = $this->itemLocationService->getTotalStock((int) $request->item_id, (int) $request->warehouse_id);
+        $item = $this->itemService->getById((int) $request->item_id);
+
+        // Difilter demander_id — stok department lain di gudang yang
+        // sama tidak boleh ikut terhitung.
+        $stock = $this->itemLocationService->getTotalStock(
+            (int) $request->item_id,
+            (int) $request->warehouse_id,
+            auth()->user()->department_id
+        );
 
         return response()->json(['stock' => $stock, 'uom' => $item->item_uom]);
     }

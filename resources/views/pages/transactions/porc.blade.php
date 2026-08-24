@@ -116,32 +116,41 @@
                 </div>
 
                 <div class="form-row">
-                    <div class="form-group col-md-4">
+                    <div class="form-group col-md-3">
                         <label>Expired <small class="text-muted">(otomatis +1 tahun)</small></label>
                         <input type="text" class="form-control row-exp-preview" readonly placeholder="Terisi otomatis">
                     </div>
-                    <div class="form-group col-md-4">
-                        <label>Berat / Qty (KG) <span class="text-danger">*</span></label>
-                        <input type="number" step="0.01" min="0" class="form-control"
-                            name="entries[__INDEX__][trans_qty]" required>
-                    </div>
-                    <div class="form-group col-md-4">
-                        <label>Jumlah Kemasan (Unit)</label>
-                        <input type="number" step="0.01" min="0" class="form-control"
-                            name="entries[__INDEX__][qty_unit]" placeholder="Contoh: 8">
-                    </div>
-                </div>
 
-                <div class="form-row">
-                    <div class="form-group col-md-6">
-                        <label>Kemasan</label>
+                    <div class="form-group col-md-3">
+                        <label>Jenis Kemasan <span class="text-danger">*</span></label>
                         <select class="form-control select2" id="entries__INDEX__package" name="entries[__INDEX__][package]"
                             required>
+                            <option value="">-- Pilih --</option>
                             <option value="BAG">BAG</option>
                             <option value="CAN">CAN</option>
                             <option value="DRUM">DRUM</option>
                             <option value="TOTE">TOTE</option>
                         </select>
+                    </div>
+
+                    <div class="form-group col-md-3">
+                        <label>Isi per Kemasan (KG) <span class="text-danger">*</span></label>
+                        <input type="number" step="0.0001" min="0.0001" class="form-control row-perpackage"
+                            name="entries[__INDEX__][qty_perpackage]" placeholder="Contoh: 200" required>
+                    </div>
+
+                    <div class="form-group col-md-3">
+                        <label>Jumlah Kemasan <span class="text-danger">*</span></label>
+                        <input type="number" step="1" min="1" class="form-control row-package"
+                            name="entries[__INDEX__][qty_package]" placeholder="Contoh: 5" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label>Total Berat <small class="text-muted">(dihitung otomatis)</small></label>
+                        <input type="text" class="form-control row-total-weight bg-light font-weight-bold" readonly
+                            placeholder="0,00 KG">
                     </div>
                 </div>
 
@@ -180,6 +189,28 @@
             $prod.on('change input', update);
         }
 
+        function bindWeightPreview($scope) {
+            const $per = $scope.find('.row-perpackage');
+            const $pkg = $scope.find('.row-package');
+            const $out = $scope.find('.row-total-weight');
+
+            function update() {
+                const per = parseFloat($per.val()) || 0;
+                const pkg = parseFloat($pkg.val()) || 0;
+                const total = per * pkg;
+
+                $out.val(total > 0 ?
+                    total.toLocaleString('id-ID', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }) + ' KG' :
+                    '');
+            }
+
+            $per.on('input change', update);
+            $pkg.on('input change', update);
+        }
+
         function renumberEntries() {
             $('#entryList .entry-block').each(function(i) {
                 $(this).find('.entry-title').text('Form PORC #' + (i + 1));
@@ -199,7 +230,8 @@
 
             window.initSelect2($entry); // ⬅️ scope HANYA ke baris baru ini
             bindExpPreview($entry);
-
+            bindExpPreview($entry);
+            bindWeightPreview($entry);
             $entry.find('.btn-remove-entry').on('click', function() {
                 $(this).closest('.entry-block').remove();
                 renumberEntries();

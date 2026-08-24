@@ -35,4 +35,6 @@ interface StockLedgerRepositoryInterface
      * CONS (kolom keluar), ADJ (kolom adjustment terpisah).
      */
     public function getStaffDailyMutation(int $itemId, Carbon $startDate, Carbon $endDate, array $warehouseIds);
+
+    public function updateByRef(string $refType, int $refId, array $data): int;
 }

@@ -38,6 +38,6 @@ class Warehouse extends Model
 
     public function isImc(): bool
     {
-        return $this->department?->code === Department::IMC_CODE;
+        return $this->department?->code === Department::CODE_IMC;
     }
 }

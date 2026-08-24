@@ -36,25 +36,27 @@ class RolesAndPermissionSeeder extends Seeder
             'items.delete',
 
             // Item Locations (Stok Gudang)
+            // 'item-locations.create' dipertahankan untuk kompatibilitas,
+            // tapi routenya dinonaktifkan — stok awal kini lewat PORC.
             'item-locations.view',
             'item-locations.create',
             'item-locations.update',
             'item-locations.delete',
 
-            // Transaksi — dipecah per jenis. "view" mengontrol jenis apa
-            // saja yang tampil di daftar transaksi untuk role tersebut.
-            // Delete hanya ada untuk PORC (CONS/ADJ tidak bisa dihapus,
-            // dikoreksi lewat ADJ baru — aturan ini di service, bukan permission).
+            // Transaksi
+            // PORC hanya di gudang IMC. CONS & ADJ hanya di gudang
+            // department — aturan zona ini ditegakkan guardZone()
+            // di TransactionService, bukan lewat permission.
             'transactions.porc.view',
             'transactions.porc.create',
+            'transactions.porc.update',   // ← BARU: edit koreksi salah input
             'transactions.porc.delete',
             'transactions.cons.view',
             'transactions.cons.create',
             'transactions.adj.view',
             'transactions.adj.create',
 
-            // Transfer Request — aksinya sendiri-sendiri karena masing-masing
-            // punya aturan otorisasi berbeda (approve = IMC, receive = penerima).
+            // Transfer Request
             'transfer-requests.view',
             'transfer-requests.create',
             'transfer-requests.cancel',
@@ -86,45 +88,46 @@ class RolesAndPermissionSeeder extends Seeder
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $admin->syncPermissions($permissions);
 
-        // imc — pusat gudang: kelola stok, SEMUA jenis transaksi
-        // (termasuk hapus PORC), approve/reject/receive transfer,
-        // lihat laporan & item master (read-only)
+        // imc — pengelola gudang pusat.
+        // CONS dan ADJ DICABUT: keduanya hanya sah di gudang department,
+        // dan guardZone() akan selalu menolaknya di gudang IMC.
         $imc = Role::firstOrCreate(['name' => 'imc']);
         $imc->syncPermissions([
             'item-locations.view',
-            'item-locations.create',
             'item-locations.update',
             'item-locations.delete',
             'transactions.porc.view',
             'transactions.porc.create',
+            'transactions.porc.update',
             'transactions.porc.delete',
+            // Tetap bisa MELIHAT transaksi department untuk pemantauan,
+            // tapi tidak bisa membuatnya.
             'transactions.cons.view',
-            'transactions.cons.create',
             'transactions.adj.view',
-            'transactions.adj.create',
             'transfer-requests.view',
             'transfer-requests.approve',
             'transfer-requests.reject',
-            'transfer-requests.receive',
             'items.view',
             'reports.view',
         ]);
 
-        // manager — pemantau: lihat laporan & item master saja
+        // manager — pemantau
         $manager = Role::firstOrCreate(['name' => 'manager']);
         $manager->syncPermissions([
             'reports.view',
             'items.view',
         ]);
 
-        // staff — operasional harian: HANYA CONS (pemakaian). PORC (terima
-        // dari vendor) dan ADJ (koreksi) sengaja tidak diberikan — itu
-        // wewenang IMC/admin.
+        // staff — operasional di gudang department.
+        // ADJ DITAMBAHKAN: koreksi stok hanya sah di gudang department,
+        // dan staff yang tahu kondisi fisiknya.
         $staff = Role::firstOrCreate(['name' => 'staff']);
         $staff->syncPermissions([
             'items.view',
             'transactions.cons.view',
             'transactions.cons.create',
+            'transactions.adj.view',
+            'transactions.adj.create',
             'transfer-requests.view',
             'transfer-requests.create',
             'transfer-requests.cancel',

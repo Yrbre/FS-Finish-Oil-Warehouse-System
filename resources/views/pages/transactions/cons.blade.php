@@ -55,7 +55,7 @@
 
                         {{-- Info stok tersedia --}}
                         <div class="alert alert-info d-none" id="stockInfo">
-                            Stok tersedia: <strong id="stockValue">0</strong> <span id="stockUom"></span>
+                            Stok milik department Anda: <strong id="stockValue">0</strong> <span id="stockUom"></span>
                         </div>
 
                         <div class="form-row">
@@ -70,10 +70,13 @@
                             </div>
 
                             <div class="form-group col-md-6">
-                                <label>Berat / Qty (KG) <span class="text-danger">*</span></label>
-                                <input type="number" step="0.01" min="0"
+                                <label>Jumlah Pemakaian (KG) <span class="text-danger">*</span></label>
+                                <input type="number" step="0.01" min="0.01"
                                     class="form-control @error('trans_qty') is-invalid @enderror" name="trans_qty"
                                     value="{{ old('trans_qty') }}" required>
+                                <small class="form-text text-muted">
+                                    Diambil otomatis dari lot terdekat expired, boleh lintas ukuran kemasan.
+                                </small>
                                 @error('trans_qty')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror

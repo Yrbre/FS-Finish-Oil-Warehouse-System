@@ -168,6 +168,7 @@ class RoleController extends Controller
 
             'transactions.porc.view'   => 'Lihat Transaksi Supply Oil (PORC)',
             'transactions.porc.create' => 'Input Supply Oil (PORC)',
+            'transactions.porc.update' => 'Edit Supply Oil (PORC)',
             'transactions.porc.delete' => 'Hapus Transaksi Supply Oil (PORC)',
             'transactions.cons.view'   => 'Lihat Transaksi Pemakaian (CONS)',
             'transactions.cons.create' => 'Input Pemakaian (CONS)',
@@ -199,7 +200,12 @@ class RoleController extends Controller
             'Gudang'           => ['warehouses.view', 'warehouses.create', 'warehouses.update', 'warehouses.delete'],
             'Item Master'      => ['items.view', 'items.create', 'items.update', 'items.delete'],
             'Stok Gudang'      => ['item-locations.view', 'item-locations.create', 'item-locations.update', 'item-locations.delete'],
-            'Transaksi - Supply Oil (PORC)'  => ['transactions.porc.view', 'transactions.porc.create', 'transactions.porc.delete'],
+            'Transaksi - Supply Oil (PORC)' => [
+                'transactions.porc.view',
+                'transactions.porc.create',
+                'transactions.porc.update',
+                'transactions.porc.delete',
+            ],
             'Transaksi - Pemakaian (CONS)'   => ['transactions.cons.view', 'transactions.cons.create'],
             'Transaksi - Adjustment (ADJ)'   => ['transactions.adj.view', 'transactions.adj.create'],
             'Transfer Request' => [

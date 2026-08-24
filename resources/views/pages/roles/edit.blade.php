@@ -39,12 +39,16 @@
                         @foreach ($permissionGroups as $groupLabel => $permissions)
                             @if (count($permissions))
                                 <div class="mb-3">
-                                    <p class="small text-muted text-uppercase mb-2">{{ $groupLabel }}</p>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <p class="small text-muted text-uppercase mb-0">{{ $groupLabel }}</p>
+                                        <button type="button" class="btn btn-sm btn-link p-0 btn-toggle-group"
+                                            data-group="{{ $loop->index }}">Pilih semua</button>
+                                    </div>
                                     @foreach ($permissions as $perm)
                                         <div class="custom-control custom-checkbox mb-1">
-                                            <input type="checkbox" class="custom-control-input"
-                                                id="perm_{{ $perm['name'] }}" name="permissions[]"
-                                                value="{{ $perm['name'] }}"
+                                            <input type="checkbox" class="custom-control-input perm-check"
+                                                data-group="{{ $loop->parent->index }}" id="perm_{{ $perm['name'] }}"
+                                                name="permissions[]" value="{{ $perm['name'] }}"
                                                 {{ in_array($perm['name'], old('permissions', $rolePermissions)) ? 'checked' : '' }}>
                                             <label class="custom-control-label" for="perm_{{ $perm['name'] }}">
                                                 {{ $perm['label'] }}
@@ -71,4 +75,16 @@
 
         </div>
     </div>
+    @push('scripts')
+        <script>
+            $('.btn-toggle-group').on('click', function() {
+                const group = $(this).data('group');
+                const $checks = $('.perm-check[data-group="' + group + '"]');
+                const allChecked = $checks.length === $checks.filter(':checked').length;
+
+                $checks.prop('checked', !allChecked);
+                $(this).text(allChecked ? 'Pilih semua' : 'Batalkan semua');
+            });
+        </script>
+    @endpush
 @endsection

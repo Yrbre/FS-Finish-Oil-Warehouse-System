@@ -6,7 +6,9 @@ use App\Models\ItemLocation;
 use App\Models\StockLedger;
 use App\Models\Transaction;
 use App\Repositories\Interfaces\ItemRepositoryInterface;
+use App\Repositories\Interfaces\StockLedgerRepositoryInterface;
 use App\Repositories\Interfaces\TransactionRepositoryInterface;
+use App\Repositories\Interfaces\WarehouseRepositoryInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\StockLedgerServiceInterface;
 use App\Services\Interfaces\TransactionServiceInterface;
@@ -15,25 +17,14 @@ use Illuminate\Support\Facades\DB;
 
 class TransactionService implements TransactionServiceInterface
 {
-    protected TransactionRepositoryInterface $transactionRepository;
-    protected ItemRepositoryInterface $itemRepository;
-    protected ItemLocationServiceInterface $itemLocationService;
-    protected StockLedgerServiceInterface $stockLedgerService;
-    protected \App\Repositories\Interfaces\StockLedgerRepositoryInterface $stockLedgerRepository;
-
     public function __construct(
-        TransactionRepositoryInterface $transactionRepository,
-        ItemRepositoryInterface $itemRepository,
-        ItemLocationServiceInterface $itemLocationService,
-        StockLedgerServiceInterface $stockLedgerService,
-        \App\Repositories\Interfaces\StockLedgerRepositoryInterface $stockLedgerRepository
-    ) {
-        $this->transactionRepository = $transactionRepository;
-        $this->itemRepository        = $itemRepository;
-        $this->itemLocationService   = $itemLocationService;
-        $this->stockLedgerService    = $stockLedgerService;
-        $this->stockLedgerRepository = $stockLedgerRepository;
-    }
+        protected TransactionRepositoryInterface $transactionRepository,
+        protected ItemRepositoryInterface $itemRepository,
+        protected WarehouseRepositoryInterface $warehouseRepository,
+        protected ItemLocationServiceInterface $itemLocationService,
+        protected StockLedgerServiceInterface $stockLedgerService,
+        protected StockLedgerRepositoryInterface $stockLedgerRepository,
+    ) {}
 
     public function getAll()
     {
@@ -47,9 +38,7 @@ class TransactionService implements TransactionServiceInterface
 
     public function create(array $data, int $createdBy)
     {
-        return DB::transaction(function () use ($data, $createdBy) {
-            return $this->persistTransaction($data, $createdBy);
-        });
+        return DB::transaction(fn() => $this->persistTransaction($data, $createdBy));
     }
 
     public function createBatch(array $entries, int $createdBy): array
@@ -75,53 +64,68 @@ class TransactionService implements TransactionServiceInterface
         });
     }
 
+    /* ================= CREATE ================= */
+
     private function persistTransaction(array $data, int $createdBy)
     {
         $item        = $this->itemRepository->getById((int) $data['item_id']);
+        $warehouse   = $this->warehouseRepository->getById((int) $data['warehouse_id']);
         $itemId      = (int) $data['item_id'];
         $warehouseId = (int) $data['warehouse_id'];
+        $demanderId  = (int) $data['demander_id'];
         $transDate   = Carbon::parse($data['trans_date']);
-        $transQty    = (float) $data['trans_qty'];
 
-        $data['receiving_lot']       = $this->itemLocationService->generateReceivingLot($transDate);
-        $data['exp_date']            = $this->applyExpiryRule($data);
-        $data['exp_by_receiving_at'] = $this->applyExpiryByReceiving($data);
+        $this->guardZone($data['doc_type'], $warehouse);
 
-        // bb_qty = kondisi stok SEKARANG di item_locations, diambil real-time.
-        // Karena masih dalam koneksi/transaction DB yang sama, kalau dalam 1 batch
-        // ada 2 form dengan item+gudang yang sama, form kedua akan lihat stok
-        // yang sudah ter-update dari form pertama (bukan snapshot basi).
-        $bbQty = $this->itemLocationService->getTotalStock($itemId, $warehouseId);
+        // PORC berbasis package: berat dihitung, bukan diinput.
+        // CONS/ADJ berbasis kg: trans_qty dipakai apa adanya.
+        $transQty = $data['doc_type'] === Transaction::DOC_PORC
+            ? $this->resolvePorcWeight($data)
+            : round((float) $data['trans_qty'], 2);
 
-        $data['item_no']    = $item->item_no;
-        $data['item_desc']  = $item->item_desc;
-        $data['item_uom']   = $item->item_uom;
-        $data['status']     = 'NEW';
-        $data['created_by'] = $createdBy;
+        $data['trans_qty'] = $transQty;
+
+        // bb_qty = stok milik department INI di gudang ini, sebelum
+        // transaksi berjalan. Difilter demander_id — stok department
+        // lain di gudang yang sama tidak boleh ikut terhitung.
+        $bbQty = $this->itemLocationService->getTotalStock($itemId, $warehouseId, $demanderId);
 
         [$inQty, $outQty] = $this->resolveDirection($data, $transQty);
-        $data['in_qty']  = $inQty;
-        $data['out_qty'] = $outQty;
 
         if ($outQty > $bbQty) {
             throw new \Exception(
                 "Stok tidak mencukupi untuk item {$item->item_no}. Stok tersedia: " .
-                    number_format($bbQty, 2, ',', '.') .
-                    ", dibutuhkan: " . number_format($outQty, 2, ',', '.')
+                    number_format($bbQty, 2, ',', '.') . " kg, dibutuhkan: " .
+                    number_format($outQty, 2, ',', '.') . " kg."
             );
         }
 
-        $ebQty = $bbQty + $inQty - $outQty;
+        $ebQty = round($bbQty + $inQty - $outQty, 2);
 
-        $data['bb_qty'] = $bbQty;
-        $data['eb_qty'] = $ebQty;
+        // receiving_lot digenerate SEKALI di sini, lalu dipakai ulang
+        // oleh lot yang dibuat applyStockMovement(). Versi lama
+        // memanggil generator dua kali — kebetulan hasilnya sama,
+        // tapi rapuh.
+        if ($data['doc_type'] === Transaction::DOC_PORC) {
+            $data['receiving_lot'] = $this->itemLocationService->generateReceivingLot($transDate);
+        }
+
+        $data['demander_id']  = $demanderId;
+        $data['item_no']      = $item->item_no;
+        $data['item_desc']    = $item->item_desc;
+        $data['item_uom']     = $item->item_uom;
+        $data['item_glclass'] = $item->item_glclass;
+        $data['status']       = 'NEW';
+        $data['created_by']   = $createdBy;
+        $data['in_qty']       = $inQty;
+        $data['out_qty']      = $outQty;
+        $data['bb_qty']       = $bbQty;
+        $data['eb_qty']       = $ebQty;
 
         $transaction = $this->transactionRepository->create($data);
 
-        // Terapkan perubahan fisik ke item_locations
         $this->applyStockMovement($transaction, $data, $transDate);
 
-        // Arsip ke ledger — murni catatan riwayat, tidak ada recalculate
         $this->stockLedgerService->record([
             'item_id'      => $itemId,
             'warehouse_id' => $warehouseId,
@@ -138,6 +142,113 @@ class TransactionService implements TransactionServiceInterface
         return $transaction->fresh();
     }
 
+    /* ================= EDIT PORC ================= */
+
+    /**
+     * Koreksi salah input PORC.
+     *
+     * Berbeda dari ADJ: ini memperbaiki angka yang memang salah ketik,
+     * bukan mencatat selisih fisik. Karena itu ledger PORC-nya
+     * DIPERBARUI, bukan ditambah baris ADJ baru — kalau ditambah,
+     * kartu stok akan menampilkan selisih yang sebenarnya tidak
+     * pernah terjadi.
+     *
+     * Qty hanya boleh diubah selama lot belum tersentuh mutasi apa pun.
+     */
+    public function updatePorc(int $id, array $data, int $editedBy)
+    {
+        return DB::transaction(function () use ($id, $data, $editedBy) {
+            $transaction = $this->transactionRepository->getById($id);
+
+            if ($transaction->doc_type !== Transaction::DOC_PORC) {
+                throw new \Exception("Hanya transaksi Supply Oil (PORC) yang dapat diedit.");
+            }
+
+            $lot = $this->findLotOfPorc($transaction);
+
+            $qtyDiubah = isset($data['qty_package']) || isset($data['qty_perpackage']);
+
+            if ($qtyDiubah && $lot->isTouched()) {
+                throw new \Exception(
+                    "Qty tidak dapat diubah karena stok lot ini sudah terpakai " .
+                        number_format($lot->consumed_weight, 2, ',', '.') . " kg. " .
+                        "Gunakan Adjustment untuk mengoreksi selisihnya."
+                );
+            }
+
+            // --- field non-qty, selalu boleh diubah ---
+            $lotUpdate = [];
+            $trxUpdate = [
+                'edited_at'   => now(),
+                'edited_by'   => $editedBy,
+                'edit_reason' => $data['edit_reason'] ?? null,
+            ];
+
+            foreach (['vendor_lot', 'package', 'production_date'] as $field) {
+                if (array_key_exists($field, $data)) {
+                    $lotUpdate[$field] = $data[$field];
+                    $trxUpdate[$field] = $data[$field];
+                }
+            }
+
+            if (array_key_exists('notes', $data)) {
+                $trxUpdate['notes'] = $data['notes'];
+            }
+
+            if (array_key_exists('exp_date', $data)) {
+                $lotUpdate['exp_date'] = $data['exp_date'];
+                $trxUpdate['exp_date'] = $data['exp_date'];
+            }
+
+            // --- qty, hanya kalau lot masih utuh ---
+            if ($qtyDiubah) {
+                $perPackage = (float) ($data['qty_perpackage'] ?? $transaction->qty_perpackage);
+                $package    = (float) ($data['qty_package'] ?? $transaction->qty_package);
+
+                if ($perPackage <= 0 || $package <= 0) {
+                    throw new \Exception("Ukuran dan jumlah package harus lebih dari 0.");
+                }
+
+                $newWeight = round($perPackage * $package, 2);
+
+                $lotUpdate['qty_perpackage'] = $perPackage;
+                $lotUpdate['qty_package']    = $package;
+                $lotUpdate['qty_weight']     = $newWeight;
+                // Lot dianggap seolah baru dibuat dengan angka terkoreksi.
+                $lotUpdate['initial_weight'] = $newWeight;
+
+                $trxUpdate['qty_perpackage'] = $perPackage;
+                $trxUpdate['qty_package']    = $package;
+                $trxUpdate['trans_qty']      = $newWeight;
+                $trxUpdate['in_qty']         = $newWeight;
+                $trxUpdate['eb_qty']         = round((float) $transaction->bb_qty + $newWeight, 2);
+            }
+
+            if (! empty($lotUpdate)) {
+                $this->itemLocationService->update($lot->id, $lotUpdate);
+            }
+
+            $this->transactionRepository->update($id, $trxUpdate);
+
+            // Ledger diperbarui, bukan ditambah — ini koreksi input,
+            // bukan mutasi baru.
+            if ($qtyDiubah) {
+                $this->stockLedgerRepository->updateByRef(
+                    StockLedger::REF_TRANSACTION,
+                    $id,
+                    [
+                        'in_qty' => $trxUpdate['in_qty'],
+                        'eb_qty' => $trxUpdate['eb_qty'],
+                    ]
+                );
+            }
+
+            return $this->transactionRepository->getById($id);
+        });
+    }
+
+    /* ================= DELETE ================= */
+
     public function delete(int $id)
     {
         return DB::transaction(function () use ($id) {
@@ -150,73 +261,144 @@ class TransactionService implements TransactionServiceInterface
                 );
             }
 
-            $this->revertPorcLot($transaction);
+            $lot = $this->findLotOfPorc($transaction);
 
+            if ($lot->isTouched()) {
+                throw new \Exception(
+                    "Tidak dapat menghapus transaksi ini karena sebagian stoknya sudah terpakai."
+                );
+            }
+
+            $this->itemLocationService->delete($lot->id);
             $this->transactionRepository->delete($id);
-
-            // Hapus arsip ledger-nya juga — tidak ada recalculate karena
-            // bb_qty/eb_qty transaksi lain sudah final saat dibuat,
-            // tidak saling bergantung satu sama lain.
             $this->stockLedgerRepository->deleteByRef(StockLedger::REF_TRANSACTION, $id);
 
             return true;
         });
     }
 
+    /* ================= PRIVATE ================= */
+
+    /**
+     * CONS dan ADJ dilarang di gudang IMC.
+     *
+     * Di IMC package harus selalu utuh — itulah yang menjamin FEFO
+     * transfer selalu bisa mengirim package penuh. Kalau CONS
+     * diizinkan di sana, akan muncul package terbuka dan jaminan
+     * itu runtuh.
+     */
+    private function guardZone(string $docType, $warehouse): void
+    {
+        $isImc = $warehouse->isImc();
+
+        if ($docType === Transaction::DOC_PORC && ! $isImc) {
+            throw new \Exception(
+                "Supply Oil hanya dapat diterima di gudang IMC. " .
+                    "Gudang {$warehouse->name} bukan gudang IMC."
+            );
+        }
+
+        if (in_array($docType, [Transaction::DOC_CONS, Transaction::DOC_ADJ], true) && $isImc) {
+            $label = $docType === Transaction::DOC_CONS ? 'Pemakaian' : 'Adjustment';
+
+            throw new \Exception(
+                "{$label} tidak dapat dilakukan di gudang IMC. " .
+                    "Ajukan Transfer Request untuk memindahkan barang ke gudang department terlebih dahulu."
+            );
+        }
+    }
+
+    /**
+     * Berat PORC = jumlah package x ukuran per package.
+     * Operator tidak menginput berat langsung.
+     */
+    private function resolvePorcWeight(array $data): float
+    {
+        $perPackage = (float) ($data['qty_perpackage'] ?? 0);
+        $package    = (float) ($data['qty_package'] ?? 0);
+
+        if ($perPackage <= 0) {
+            throw new \Exception("Ukuran per package harus lebih dari 0.");
+        }
+
+        if ($package <= 0) {
+            throw new \Exception("Jumlah package harus lebih dari 0.");
+        }
+
+        return round($perPackage * $package, 2);
+    }
+
+    /**
+     * Versi lama diam-diam menganggap adj_type yang tidak dikenali
+     * sebagai OUT — artinya salah ketik akan mengurangi stok tanpa
+     * peringatan.
+     */
     private function resolveDirection(array $data, float $transQty): array
     {
         switch ($data['doc_type']) {
             case Transaction::DOC_PORC:
-                return [$transQty, 0];
+                return [$transQty, 0.0];
 
             case Transaction::DOC_CONS:
-                return [0, $transQty];
+            case Transaction::DOC_DISPOSAL:
+                return [0.0, $transQty];
 
             case Transaction::DOC_ADJ:
-                return ($data['adj_type'] ?? null) === Transaction::ADJ_IN
-                    ? [$transQty, 0]
-                    : [0, $transQty];
+                $adjType = $data['adj_type'] ?? null;
+
+                if ($adjType === Transaction::ADJ_IN) {
+                    return [$transQty, 0.0];
+                }
+
+                if ($adjType === Transaction::ADJ_OUT) {
+                    return [0.0, $transQty];
+                }
+
+                throw new \Exception("Jenis adjustment harus dipilih (penambahan atau pengurangan).");
 
             default:
                 throw new \Exception("Jenis transaksi tidak dikenali: " . $data['doc_type']);
         }
     }
 
-    /**
-     * Terapkan perubahan ke item_locations — inilah "sumber kebenaran" stok.
-     */
-    private function applyStockMovement(Transaction $transaction, array $data, \DateTime $transDate): void
+    private function applyStockMovement(Transaction $transaction, array $data, Carbon $transDate): void
     {
         switch ($transaction->doc_type) {
             case Transaction::DOC_PORC:
-                $this->itemLocationService->create([
-                    'item_id'             => $transaction->item_id,
-                    'warehouse_id'        => $transaction->warehouse_id,
-                    'demander_id'         => $data['demander_id'] ?? null,
-                    'vendor_lot'          => $data['vendor_lot'] ?? null,
-                    'receiving_lot'       => $this->itemLocationService->generateReceivingLot($transDate),
-                    'production_date'     => $data['production_date'] ?? null,
-                    'qty_weight'          => $transaction->in_qty,
-                    'qty_unit'            => $data['qty_unit'] ?? null,
-                    'package'             => $data['package'] ?? null,
-                    'received_date'       => $transaction->trans_date,
-                    'exp_by_receiving_at' => $data['exp_by_receiving_at'] ?? null,
-                    'is_warehouse_stock'  => true,
+                $this->itemLocationService->addLot([
+                    'item_id'         => $transaction->item_id,
+                    'warehouse_id'    => $transaction->warehouse_id,
+                    'demander_id'     => $transaction->demander_id,
+                    'vendor_lot'      => $data['vendor_lot'] ?? null,
+                    // Pakai nomor yang sudah digenerate, jangan generate lagi.
+                    'receiving_lot'   => $transaction->receiving_lot,
+                    'production_date' => $data['production_date'] ?? null,
+                    'exp_date'        => $data['exp_date'] ?? null,
+                    'qty_perpackage'  => $data['qty_perpackage'],
+                    'qty_package'     => $data['qty_package'],
+                    'package'         => $data['package'] ?? null,
+                    'received_date'   => $transDate->toDateString(),
+                    'is_warehouse_stock' => true,
                 ]);
                 break;
 
             case Transaction::DOC_CONS:
-                $allocation = $this->itemLocationService->allocateFefo(
+                $result = $this->itemLocationService->allocateForCons(
                     (int) $transaction->item_id,
                     (int) $transaction->warehouse_id,
+                    (int) $transaction->demander_id,
                     (float) $transaction->out_qty
                 );
 
-                foreach ($allocation as $row) {
-                    $this->itemLocationService->deductLot(
-                        $row['item_location']->id,
-                        $row['qty_to_take']
+                if (! $result->isFulfilled()) {
+                    throw new \Exception(
+                        "Stok tidak mencukupi. Kurang " .
+                            number_format($result->shortage, 2, ',', '.') . " kg."
                     );
+                }
+
+                foreach ($result->lines as $line) {
+                    $this->itemLocationService->deductLot($line->lot->id, $line->qtyTaken);
                 }
                 break;
 
@@ -227,68 +409,48 @@ class TransactionService implements TransactionServiceInterface
 
                 $lot = $this->itemLocationService->getById((int) $data['item_location_id']);
 
-                $newQty = (float) $lot->qty_weight
-                    + (float) $transaction->in_qty
-                    - (float) $transaction->out_qty;
+                if ((int) $lot->demander_id !== (int) $transaction->demander_id) {
+                    throw new \Exception("Lot yang dipilih bukan milik department ini.");
+                }
 
-                if ($newQty < 0) {
+                $newWeight = round(
+                    (float) $lot->qty_weight
+                        + (float) $transaction->in_qty
+                        - (float) $transaction->out_qty,
+                    2
+                );
+
+                if ($newWeight < 0) {
                     throw new \Exception(
                         "Adjustment membuat stok lot menjadi minus. Stok lot saat ini: " .
-                            number_format((float) $lot->qty_weight, 2, ',', '.')
+                            number_format((float) $lot->qty_weight, 2, ',', '.') . " kg."
                     );
                 }
 
-                $this->itemLocationService->update($lot->id, ['qty_weight' => $newQty]);
+                $this->itemLocationService->update($lot->id, ['qty_weight' => $newWeight]);
                 break;
         }
     }
 
-    private function revertPorcLot(Transaction $transaction): void
+    /**
+     * Cari lot yang dibuat oleh sebuah transaksi PORC.
+     *
+     * Versi lama mencari pakai vendor_lot + received_date — dua PORC
+     * di hari sama dengan vendor_lot sama (atau dua-duanya null)
+     * akan mengambil lot acak. receiving_lot unik per penerimaan,
+     * jadi pasti tepat.
+     */
+    private function findLotOfPorc(Transaction $transaction): ItemLocation
     {
-        $lot = ItemLocation::where('item_id', $transaction->item_id)
+        $lot = ItemLocation::where('receiving_lot', $transaction->receiving_lot)
+            ->where('item_id', $transaction->item_id)
             ->where('warehouse_id', $transaction->warehouse_id)
-            ->where('vendor_lot', $transaction->vendor_lot)
-            ->where('received_date', $transaction->trans_date)
             ->first();
 
         if (! $lot) {
-            throw new \Exception("Lot dari transaksi ini sudah tidak ditemukan, tidak dapat dihapus.");
+            throw new \Exception("Lot dari transaksi ini sudah tidak ditemukan.");
         }
 
-        if ((float) $lot->qty_weight < (float) $transaction->in_qty) {
-            throw new \Exception(
-                "Tidak dapat menghapus transaksi ini karena sebagian stoknya sudah terpakai."
-            );
-        }
-
-        $remaining = (float) $lot->qty_weight - (float) $transaction->in_qty;
-
-        if ($remaining > 0) {
-            $this->itemLocationService->update($lot->id, ['qty_weight' => $remaining]);
-        } else {
-            $this->itemLocationService->delete($lot->id);
-        }
-    }
-
-    private function applyExpiryRule(array $data): string|null
-    {
-        if (! empty($data['production_date'])) {
-            $data['exp_date'] = Carbon::parse($data['production_date'])
-                ->addYear()
-                ->toDateString();
-        }
-
-        return $data['exp_date'] ?? null;
-    }
-
-    private function applyExpiryByReceiving(array $data): string|null
-    {
-        if (! empty($data['trans_date'])) {
-            $data['exp_by_receiving_at'] = Carbon::parse($data['trans_date'])
-                ->addYear()
-                ->toDateString();
-        }
-
-        return $data['exp_by_receiving_at'] ?? null;
+        return $lot;
     }
 }

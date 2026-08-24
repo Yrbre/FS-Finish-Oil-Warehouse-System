@@ -145,6 +145,11 @@ Route::middleware('auth')->group(function () {
         Route::post('transactions/adjustment', [TransactionController::class, 'storeAdj'])->name('transactions.adj.store');
     });
 
+    Route::middleware('can:transactions.porc.update')->group(function () {
+        Route::get('transactions/{id}/edit', [TransactionController::class, 'editPorc'])->name('transactions.porc.edit');
+        Route::put('transactions/{id}', [TransactionController::class, 'updatePorc'])->name('transactions.porc.update');
+    });
+
     Route::middleware('can:transactions.porc.delete')->group(function () {
         Route::delete('transactions/{id}', [TransactionController::class, 'destroy'])->name('transactions.destroy');
     });
