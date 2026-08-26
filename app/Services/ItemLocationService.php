@@ -231,4 +231,14 @@ class ItemLocationService implements ItemLocationServiceInterface
 
         return $data;
     }
+
+    public function getTransferLots(int $itemId, int $demanderId, array $warehouseIds, float $perPackage): Collection
+    {
+        return $this->itemLocationRepository->getFefoLotsForTransfer(
+            $itemId,
+            $demanderId,
+            $warehouseIds,
+            $perPackage
+        );
+    }
 }

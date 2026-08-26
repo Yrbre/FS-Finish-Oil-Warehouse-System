@@ -12,23 +12,31 @@ class ReceiptOfGoods extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $table = 'receipt_of_goods';
+
     protected $fillable = [
         'letter_number',
         'letter_date',
         'transfer_request_id',
         'responsibility_id',
-        'photo'
+        'photo',
     ];
+
+    protected $casts = [
+        'letter_date' => 'date',
+    ];
+
+    /** User yang membuat tanda terima ini. */
+    public function responsibility()
+    {
+        return $this->belongsTo(User::class, 'responsibility_id');
+    }
 
     public function transferRequest()
     {
         return $this->belongsTo(TransferRequest::class, 'transfer_request_id', 'id');
     }
 
-    public function responsibility()
-    {
-        return $this->belongsTo(User::class, 'responsibility_id', 'id');
-    }
 
     public static function generateNomorSurat(?string $tanggal = null): string
     {

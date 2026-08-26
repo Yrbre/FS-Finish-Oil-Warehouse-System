@@ -13,10 +13,20 @@ return new class extends Migration
     {
         Schema::create('receipt_of_goods', function (Blueprint $table) {
             $table->id();
-            $table->string('letter_number')->nullable();
-            $table->date('letter_date')->nullable();
-            $table->foreignId('transfer_request_id')->constrained('transfer_requests')->onDelete('cascade');
-            $table->foreignId('responsibility_id')->constrained('users')->onDelete('cascade');
+
+            // Format: 0001/IMC/VIII/2026
+            $table->string('letter_number')->unique();
+            $table->date('letter_date');
+
+            // Satu request = satu tanda terima. Tidak ada terima
+            // sebagian, jadi unique.
+            $table->foreignId('transfer_request_id')->unique()
+                ->constrained('transfer_requests')->onDelete('cascade');
+
+            // User yang membuat & mencetak tanda terima ini.
+            // Diisi otomatis dari user yang login, tidak dipilih manual.
+            $table->foreignId('responsibility_id')->constrained('users')->restrictOnDelete();
+
             $table->string('photo')->nullable();
             $table->timestamps();
             $table->softDeletes();

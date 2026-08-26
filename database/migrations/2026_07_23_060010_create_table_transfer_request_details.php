@@ -16,13 +16,23 @@ return new class extends Migration
             $table->foreignId('transfer_request_id')->constrained('transfer_requests')->cascadeOnDelete();
             $table->foreignId('item_location_id')->constrained('item_locations');
             $table->foreignId('source_warehouse_id')->constrained('warehouses');
+
             $table->string('vendor_lot')->nullable();
+            $table->string('receiving_lot')->nullable();
             $table->date('exp_date')->nullable();
             $table->date('production_date')->nullable();
             $table->string('package')->nullable();
+
+            // qty_taken = package_taken x qty_perpackage
+            $table->decimal('qty_perpackage', 15, 4);
+            $table->decimal('package_taken', 15, 2);
             $table->decimal('qty_taken', 15, 2);
-            $table->decimal('qty_unit', 15, 2)->nullable();
-            $table->unsignedBigInteger('dest_item_location_id')->nullable();
+
+            // FK ini sebelumnya tidak ada, jadi bisa menunjuk lot yang
+            // sudah terhapus tanpa ketahuan.
+            $table->foreignId('dest_item_location_id')->nullable()
+                ->constrained('item_locations')->nullOnDelete();
+
             $table->timestamps();
         });
     }

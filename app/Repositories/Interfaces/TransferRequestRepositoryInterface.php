@@ -24,4 +24,8 @@ interface TransferRequestRepositoryInterface
      * Apakah user ini terdaftar sebagai approver transfer (IMC)?
      */
     public function isApprover(int $userId): bool;
+
+
+    /** Versi dengan row lock — cegah dua approver memproses bersamaan. */
+    public function getByIdForUpdate(int $id);
 }

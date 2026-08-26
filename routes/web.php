@@ -166,16 +166,17 @@ Route::middleware('auth')->group(function () {
     // /transfer-requests/{id} dengan id="create".
     Route::middleware('can:transfer-requests.create')->group(function () {
         Route::get('transfer-requests/create', [TransferRequestController::class, 'create'])->name('transfer-requests.create');
+        Route::get('transfer-requests/package-sizes', [TransferRequestController::class, 'getPackageSizes'])->name('transfer-requests.package-sizes');
         Route::post('transfer-requests', [TransferRequestController::class, 'store'])->name('transfer-requests.store');
     });
 
-
+    Route::post('transfer-requests/cetak-batch', [TransferRequestController::class, 'cetakBatch'])
+        ->name('transfer-requests.cetak-batch');
 
     Route::middleware('can:transfer-requests.view')->group(function () {
-        Route::match(['get', 'post'], '/transfer-requests/cetak-batch', [TransferRequestController::class, 'cetakBatch'])
-            ->name('transfer-requests.cetak-batch');
         Route::get('transfer-requests', [TransferRequestController::class, 'index'])->name('transfer-requests.index');
-        Route::get('transfer-requests/{id}', [TransferRequestController::class, 'show'])->name('transfer-requests.show');
+        Route::get('transfer-requests/{id}', [TransferRequestController::class, 'show'])
+            ->whereNumber('id')->name('transfer-requests.show');
     });
 
     Route::middleware('can:transfer-requests.cancel')->group(function () {
@@ -190,6 +191,11 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:transfer-requests.receive')->group(function () {
         Route::post('transfer-requests/{id}/receive', [TransferRequestController::class, 'receive'])->name('transfer-requests.receive');
     });
+
+    // Tanda terima barang — akses diatur per user lewat kolom
+    // users.can_issue_receipt, dicek di service.
+    Route::post('transfer-requests/{id}/receipt', [TransferRequestController::class, 'issueReceipt'])->name('transfer-requests.issue-receipt');
+    Route::get('transfer-requests/{id}/receipt', [TransferRequestController::class, 'printReceipt'])->name('transfer-requests.receipt');
 });
 
 /*

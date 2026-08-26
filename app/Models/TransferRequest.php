@@ -119,6 +119,11 @@ class TransferRequest extends Model
         return $this->belongsTo(User::class, 'cancelled_by');
     }
 
+    public function receiptOfGoods()
+    {
+        return $this->hasOne(ReceiptOfGoods::class);
+    }
+
     /**
      * Request hanya bisa dibatalkan requester selama belum ada
      * approval maupun penolakan.

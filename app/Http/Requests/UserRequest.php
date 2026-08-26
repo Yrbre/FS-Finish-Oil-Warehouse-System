@@ -37,6 +37,7 @@ class UserRequest extends FormRequest
             'department_id'         => ['required', 'exists:departments,id'],
             'role'                  => ['required', 'exists:roles,name'],
             'is_transfer_approver'  => ['nullable', 'boolean'],
+            'can_issue_receipt'     => ['nullable', 'boolean'],
         ];
     }
 

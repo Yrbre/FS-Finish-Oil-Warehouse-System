@@ -31,6 +31,7 @@ class UserService implements UserServiceInterface
         return DB::transaction(function () use ($data) {
             $role                = $data['role'];
             $isTransferApprover  = (bool) ($data['is_transfer_approver'] ?? false);
+            $data['can_issue_receipt'] = (bool) ($data['can_issue_receipt'] ?? false);
 
             unset($data['role'], $data['is_transfer_approver']);
 

@@ -64,4 +64,7 @@ interface ItemLocationServiceInterface
     public function getNearExpiring(int $days = 30, int $limit = 10);
 
     public function getStockSummaryByWarehouse();
+
+    /** Semua lot yang bisa dipakai transfer, untuk form alokasi manual. */
+    public function getTransferLots(int $itemId, int $demanderId, array $warehouseIds, float $perPackage): Collection;
 }

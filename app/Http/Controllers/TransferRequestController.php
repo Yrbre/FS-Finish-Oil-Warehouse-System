@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ReceiptBatchRequest;
+use App\Http\Requests\ReceiptOfGoodsRequest;
 use App\Http\Requests\RejectTransferRequestRequest;
 use App\Http\Requests\TransferRequestStoreRequest;
 use App\Models\TransferRequest;
@@ -41,8 +43,8 @@ class TransferRequestController extends Controller
                 }
 
                 // Non-approver hanya lihat request miliknya sendiri
-                if (! auth()->user()->can('transfer-requests.approve')) {
-                    $transferRequests->where('requested_by', auth()->id());
+                if (! auth()->user()->hasRole('admin') && ! auth()->user()->can('transfer-requests.approve')) {
+                    $transferRequests->where('department_id', auth()->user()->department_id);
                 }
 
                 return DataTables::of($transferRequests)
@@ -55,11 +57,7 @@ class TransferRequestController extends Controller
                     ->addColumn('requester', fn($row) => $row->requester->name)
                     ->addColumn('status', fn($row) => $this->statusBadge($row->status))
                     ->addColumn('action', function ($row) {
-                        $urlCetakSatuan = route('transfer-requests.cetak-batch', ['ids' => [$row->id]]);
-
-                        $buttons = '<a href="' . route('transfer-requests.show', $row->id) . '" class="btn btn-sm btn-info">Detail</a>' .
-                            ' <a href="' . $urlCetakSatuan . '" target="_blank" class="btn btn-sm btn-warning">Cetak</a>';
-                        return $buttons;
+                        return '<a href="' . route('transfer-requests.show', $row->id) . '" class="btn btn-sm btn-info">Detail</a>';
                     })
                     ->rawColumns(['status', 'action', 'checkbox'])
                     ->make(true);
@@ -72,37 +70,35 @@ class TransferRequestController extends Controller
         }
     }
 
-    public function cetakBatch(Request $request)
+    public function cetakBatch(ReceiptBatchRequest $request)
     {
-        $request->validate([
-            'ids'   => 'required|array|min:1',
-            'ids.*' => 'exists:transfer_requests,id',
-        ]);
+        try {
+            $transferRequests = $this->transferRequestService->issueReceiptBatch(
+                $request->validated()['ids'],
+                auth()->id(),
+                $request->validated()['letter_date']
+            );
 
-        $transferRequests = TransferRequest::with([
-            'details.itemLocation.item',
-            'destinationWarehouse',
-            'requester',
-        ])->whereIn('id', $request->ids)->get();
+            $pdf = Pdf::loadView('pdf.receipt-of-goods', compact('transferRequests'))
+                ->setPaper('letter', 'portrait');
 
-        if ($transferRequests->isEmpty()) {
-            return redirect()->back()->with('error', 'Tidak ada data yang dipilih.');
+            return $pdf->stream('tanda-terima-' . now()->format('YmdHis') . '.pdf');
+        } catch (\Exception $e) {
+            Log::error('Gagal cetak tanda terima batch: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', $e->getMessage());
         }
-
-        $pdf = Pdf::loadView('pdf.ttb-batch', compact('transferRequests'))
-            ->setPaper('letter', 'portrait');
-
-        return $pdf->stream('ttb-batch-' . now()->format('YmdHis') . '.pdf');
     }
+
+
 
     public function create()
     {
         $items      = $this->itemService->getAll()->get();
-        if (auth()->user()->hasRole('admin')) {
-            $warehouses = $this->warehouseService->getAll()->get();
-        } else {
-            $warehouses = $this->warehouseService->getByDepartment(auth()->user()->department_id);
-        }
+
+        $warehouses = auth()->user()->hasRole('admin')
+            ? $this->warehouseService->getAll()->get()
+            : $this->warehouseService->getByDepartment(auth()->user()->department_id);
 
 
         return view('pages.transfer_requests.create', compact('items', 'warehouses'));
@@ -113,6 +109,10 @@ class TransferRequestController extends Controller
         try {
             $data = $request->validated();
             $data['department_id'] = auth()->user()->department_id;
+
+            if (! $data['department_id']) {
+                throw new \Exception("Akun Anda belum terdaftar di department manapun.");
+            }
 
             $transferRequest = $this->transferRequestService->create($data, auth()->id());
 
@@ -128,19 +128,15 @@ class TransferRequestController extends Controller
     {
         try {
             $transferRequest = $this->transferRequestService->getById((int) $id);
+            $this->guardCanView($transferRequest);
 
             $recommendation = null;
-            $availableLots  = null;
 
             if ($transferRequest->status === TransferRequest::STATUS_NEW) {
-                // Tetap dihitung untuk info ringkas (total & status cukup/tidak)
                 $recommendation = $this->transferRequestService->getRecommendation((int) $id);
-
-                // Daftar LENGKAP lot yang bisa dipilih manual, dengan saran FEFO
-                $availableLots = $this->transferRequestService->getAvailableLots((int) $id);
             }
 
-            return view('pages.transfer_requests.show', compact('transferRequest', 'recommendation', 'availableLots'));
+            return view('pages.transfer_requests.show', compact('transferRequest', 'recommendation'));
         } catch (\Exception $e) {
             Log::error('Gagal menampilkan detail Permintaan Kirim Barang : ' . $e->getMessage());
             return redirect()->route('transfer-requests.index')->with('error', 'Permintaan Kirim Barang tidak ditemukan.');
@@ -150,14 +146,13 @@ class TransferRequestController extends Controller
     public function approve(Request $request, string $id)
     {
         try {
-            // allocation[] dikirim dari form: item_location_id => qty.
-            // Kalau approver tidak ubah apapun, nilainya = saran FEFO
-            // (sudah di-pre-fill di view) — jadi hasilnya sama saja
-            // seperti auto-approve, tapi tetap lewat jalur validasi manual.
+            // allocation[] dari form: item_location_id => jumlah PACKAGE.
+            // Kalau approver tidak mengubah apa pun, nilainya = saran FEFO
+            // yang sudah di-pre-fill di view.
             $manualAllocation = $request->filled('allocation')
                 ? collect($request->input('allocation'))
-                ->map(fn($qty) => (float) $qty)
-                ->filter(fn($qty) => $qty > 0)
+                ->map(fn($pkg) => (float) $pkg)
+                ->filter(fn($pkg) => $pkg > 0)
                 ->toArray()
                 : null;
 
@@ -225,6 +220,7 @@ class TransferRequestController extends Controller
     {
         $map = [
             TransferRequest::STATUS_NEW        => 'badge-secondary',
+            TransferRequest::STATUS_APPROVED   => 'badge-info',
             TransferRequest::STATUS_IN_TRANSIT => 'badge-primary',
             TransferRequest::STATUS_RECEIVED   => 'badge-success',
             TransferRequest::STATUS_REJECTED   => 'badge-danger',
@@ -234,5 +230,96 @@ class TransferRequestController extends Controller
         $class = $map[$status] ?? 'badge-secondary';
 
         return '<span class="badge ' . $class . '">' . strtoupper($status) . '</span>';
+    }
+
+    /**
+     * AJAX: ukuran kemasan yang tersedia di IMC untuk department user.
+     * Dipakai dropdown di form request supaya staff tidak bisa
+     * meminta ukuran yang tidak ada atau melebihi stok.
+     */
+    public function getPackageSizes(Request $request)
+    {
+        $request->validate(['item_id' => ['required', 'exists:items,id']]);
+
+        $demanderId = auth()->user()->department_id;
+
+        if (! $demanderId) {
+            return response()->json([]);
+        }
+
+        $sizes = $this->transferRequestService->getAvailablePackageSizes(
+            (int) $request->item_id,
+            (int) $demanderId
+        );
+
+        return response()->json($sizes);
+    }
+
+    public function issueReceipt(ReceiptOfGoodsRequest $request, string $id)
+    {
+        try {
+            $data = $request->validated();
+
+            if ($request->hasFile('photo')) {
+                $data['photo'] = $request->file('photo')->store('receipts', 'public');
+            }
+
+            $this->transferRequestService->issueReceipt((int) $id, auth()->id(), $data);
+
+            return redirect()->route('transfer-requests.receipt', $id);
+        } catch (\Exception $e) {
+            Log::error('Gagal membuat tanda terima: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', $e->getMessage())->withInput();
+        }
+    }
+
+    /**
+     * Cetak tanda terima. Cetak pertama sudah dilakukan issueReceipt();
+     * di sini hanya menaikkan print_count sebagai jejak berapa kali
+     * dokumen dicetak ulang.
+     */
+    public function printReceipt(string $id)
+    {
+        try {
+            $transferRequest = $this->transferRequestService->getById((int) $id);
+
+            $this->guardCanView($transferRequest);
+
+            if (! $transferRequest->receiptOfGoods) {
+                throw new \Exception("Tanda terima untuk request ini belum dibuat.");
+            }
+
+            $this->transferRequestService->markPrinted([$transferRequest->id]);
+
+            // Template menerima koleksi, jadi cetak satuan dan batch
+            // memakai layout yang persis sama.
+            $transferRequests = collect([$transferRequest]);
+
+            $pdf = Pdf::loadView('pdf.receipt-of-goods', compact('transferRequests'))
+                ->setPaper('letter', 'portrait');
+
+            return $pdf->stream('tanda-terima-' . $transferRequest->transfer_code . '.pdf');
+        } catch (\Exception $e) {
+            Log::error('Gagal mencetak tanda terima: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    private function guardCanView(TransferRequest $transferRequest): void
+    {
+        $user = auth()->user();
+
+        if ($user->hasRole('admin') || $user->can('transfer-requests.approve')) {
+            return;
+        }
+
+        $milikSendiri  = (int) $transferRequest->requested_by === (int) $user->id;
+        $departmentSama = (int) $transferRequest->department_id === (int) $user->department_id;
+
+        if (! $milikSendiri && ! $departmentSama) {
+            throw new \Exception("Anda tidak memiliki akses ke Permintaan Kirim Barang ini.");
+        }
     }
 }

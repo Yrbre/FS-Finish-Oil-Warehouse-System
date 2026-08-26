@@ -2,34 +2,28 @@
 
 namespace App\Services;
 
+use App\Models\Department;
+use App\Models\ReceiptOfGoods;
 use App\Models\StockLedger;
 use App\Models\TransferRequest;
+use App\Models\User;
 use App\Repositories\Interfaces\TransferRequestRepositoryInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\StockLedgerServiceInterface;
 use App\Services\Interfaces\TransferRequestServiceInterface;
 use App\Services\Interfaces\WarehouseServiceInterface;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class TransferRequestService implements TransferRequestServiceInterface
 {
-    protected TransferRequestRepositoryInterface $transferRequestRepository;
-    protected ItemLocationServiceInterface $itemLocationService;
-    protected StockLedgerServiceInterface $stockLedgerService;
-    protected WarehouseServiceInterface $warehouseService;
-
     public function __construct(
-        TransferRequestRepositoryInterface $transferRequestRepository,
-        ItemLocationServiceInterface $itemLocationService,
-        StockLedgerServiceInterface $stockLedgerService,
-        WarehouseServiceInterface $warehouseService
-    ) {
-        $this->transferRequestRepository = $transferRequestRepository;
-        $this->itemLocationService       = $itemLocationService;
-        $this->stockLedgerService        = $stockLedgerService;
-        $this->warehouseService          = $warehouseService;
-    }
+        protected TransferRequestRepositoryInterface $transferRequestRepository,
+        protected ItemLocationServiceInterface $itemLocationService,
+        protected StockLedgerServiceInterface $stockLedgerService,
+        protected WarehouseServiceInterface $warehouseService,
+    ) {}
 
     public function getAll()
     {
@@ -41,45 +35,86 @@ class TransferRequestService implements TransferRequestServiceInterface
         return $this->transferRequestRepository->getById($id);
     }
 
+    /* ================= CREATE ================= */
+
     public function create(array $data, int $requestedBy)
     {
-        $data['transfer_code'] = TransferRequest::generateTransferCode();
-        $data['status']        = TransferRequest::STATUS_NEW;
-        $data['requested_by']  = $requestedBy;
+        return DB::transaction(function () use ($data, $requestedBy) {
+            $perPackage = (float) $data['requested_perpackage'];
+            $package    = (float) $data['requested_package'];
 
-        return $this->transferRequestRepository->create($data);
+            // Berat SELALU hasil perkalian — disimpan untuk laporan,
+            // bukan untuk perhitungan alokasi.
+            $data['requested_qty']  = round($perPackage * $package, 2);
+            // Generate DI DALAM transaksi bersama insert-nya, supaya
+            // lock baris tidak lepas sebelum baris baru tersimpan.
+            $data['transfer_code']  = TransferRequest::generateTransferCode();
+            $data['status']         = TransferRequest::STATUS_NEW;
+            $data['requested_by']   = $requestedBy;
+
+            return $this->transferRequestRepository->create($data);
+        });
     }
+
+    public function getAvailablePackageSizes(int $itemId, int $demanderId): Collection
+    {
+        return $this->itemLocationService->getAvailablePackageSizes(
+            $itemId,
+            $demanderId,
+            $this->sourceWarehouseIds()
+        );
+    }
+
+    /* ================= REKOMENDASI ================= */
 
     public function getRecommendation(int $id): array
     {
-        $request = $this->transferRequestRepository->getById($id);
+        $request    = $this->transferRequestRepository->getById($id);
+        $sourceIds  = $this->sourceWarehouseIds($request->destination_warehouse_id);
+        $perPackage = (float) $request->requested_perpackage;
 
-        // Sumber transfer hanya boleh dari gudang milik department IMC,
-        // dan gudang tujuan tidak boleh jadi sumber untuk dirinya sendiri.
-        $sourceWarehouseIds = array_values(array_diff(
-            $this->warehouseService->getIdsByDepartmentCode(TransferRequest::SOURCE_DEPARTMENT_CODE),
-            [(int) $request->destination_warehouse_id]
-        ));
-
-        $remainingQty = 0.0;
-
-        $allocation = $this->itemLocationService->allocateFefoAcrossWarehouses(
+        $result = $this->itemLocationService->allocateForTransfer(
             (int) $request->item_id,
-            (float) $request->requested_qty,
-            $sourceWarehouseIds,
-            $remainingQty
+            (int) $request->department_id,
+            $sourceIds,
+            $perPackage,
+            (float) $request->requested_package
         );
 
+        // Seluruh lot yang memenuhi syarat (bukan hanya yang terpakai
+        // FEFO) — approver boleh memilih lot lain, misalnya karena
+        // isu mutu pada lot tertentu.
+        $lots = $this->itemLocationService->getTransferLots(
+            (int) $request->item_id,
+            (int) $request->department_id,
+            $sourceIds,
+            $perPackage
+        );
+
+        // [item_location_id => jumlah package] hasil FEFO, untuk pre-fill form.
+        $suggestions = $result->lines
+            ->mapWithKeys(fn($line) => [$line->lot->id => $line->packageTaken])
+            ->all();
+
         return [
-            'allocation'    => $allocation,
-            'remaining_qty' => $remainingQty,
-            'is_fulfilled'  => $remainingQty <= 0,
+            'allocation'    => $result,
+            'lots'          => $lots,
+            'suggestions'   => $suggestions,
+            'shortage'      => $result->shortage,
+            'is_fulfilled'  => $result->isFulfilled(),
+            'total_package' => $result->totalPackage(),
+            'total_weight'  => round($result->totalPackage() * $perPackage, 2),
         ];
     }
+
+    /* ================= APPROVE ================= */
 
     public function approve(int $id, int $approvedBy, ?string $effectiveDate = null, ?array $manualAllocation = null)
     {
         return DB::transaction(function () use ($id, $approvedBy, $effectiveDate, $manualAllocation) {
+            // Lock supaya dua approver yang menekan tombol bersamaan
+            // tidak sama-sama lolos pengecekan status.
+            $this->transferRequestRepository->getByIdForUpdate($id);
             $request = $this->transferRequestRepository->getById($id);
 
             $this->guardApprover($approvedBy);
@@ -88,61 +123,43 @@ class TransferRequestService implements TransferRequestServiceInterface
                 throw new \Exception("Request ini sudah diproses sebelumnya.");
             }
 
-            $allocation = ! empty($manualAllocation)
+            $lines = ! empty($manualAllocation)
                 ? $this->buildManualAllocation($request, $manualAllocation)
                 : $this->buildAutoAllocation($id);
 
             $transDate = $effectiveDate ? Carbon::parse($effectiveDate) : now();
 
-            // Kelompokkan alokasi per warehouse asal — supaya bb_qty dihitung
-            // 1x per warehouse (kondisi SEBELUM lot-lot di warehouse itu
-            // dikurangi), bukan per lot.
-            $groupedByWarehouse = collect($allocation)
-                ->groupBy(fn($row) => $row['item_location']->warehouse_id);
-
             $details = [];
 
-            foreach ($groupedByWarehouse as $warehouseId => $rows) {
+            // Dikelompokkan per gudang asal supaya bb_qty dihitung
+            // sekali per gudang — kondisi SEBELUM lot-lot di gudang
+            // itu dipotong, bukan per lot.
+            foreach ($lines->groupBy(fn($line) => (int) $line->lot->warehouse_id) as $warehouseId => $rows) {
                 $warehouseId = (int) $warehouseId;
 
-                $bbQty = $this->itemLocationService->getTotalStock((int) $request->item_id, $warehouseId);
+                $bbQty = $this->itemLocationService->getTotalStock(
+                    (int) $request->item_id,
+                    $warehouseId,
+                    (int) $request->department_id
+                );
 
-                $totalTakenFromWarehouse = 0.0;
+                $totalTaken = 0.0;
 
-                foreach ($rows as $row) {
-                    $lot   = $row['item_location'];
-                    $taken = $row['qty_to_take'];
+                foreach ($rows as $line) {
+                    $this->itemLocationService->deductLot($line->lot->id, $line->qtyTaken);
+                    $totalTaken += $line->qtyTaken;
 
-                    $this->itemLocationService->deductLot($lot->id, $taken);
-                    $totalTakenFromWarehouse += $taken;
-
-                    $unitRatio = (float) $lot->qty_weight > 0 ? $taken / (float) $lot->qty_weight : 0;
-
-                    $details[] = [
-                        'transfer_request_id' => $request->id,
-                        'item_location_id'    => $lot->id,
-                        'source_warehouse_id' => $warehouseId,
-                        'vendor_lot'          => $lot->vendor_lot,
-                        'exp_date'            => $lot->exp_date?->toDateString(),
-                        'production_date'     => $lot->production_date?->toDateString(),
-                        'package'             => $lot->package,
-                        'qty_taken'           => $taken,
-                        'qty_unit'            => round((float) $lot->qty_unit * $unitRatio, 2),
-                        'created_at'          => now(),
-                        'updated_at'          => now(),
-                    ];
+                    $details[] = $line->toDetailArray($request->id);
                 }
-
-                $ebQty = $bbQty - $totalTakenFromWarehouse;
 
                 $this->stockLedgerService->record([
                     'item_id'      => $request->item_id,
                     'warehouse_id' => $warehouseId,
                     'trans_date'   => $transDate->toDateString(),
                     'in_qty'       => 0,
-                    'out_qty'      => $totalTakenFromWarehouse,
+                    'out_qty'      => round($totalTaken, 2),
                     'bb_qty'       => $bbQty,
-                    'eb_qty'       => $ebQty,
+                    'eb_qty'       => round($bbQty - $totalTaken, 2),
                     'doc_type'     => StockLedger::DOC_TRANSFER_OUT,
                     'ref_type'     => StockLedger::REF_TRANSFER_OUT,
                     'ref_id'       => $request->id,
@@ -160,137 +177,245 @@ class TransferRequestService implements TransferRequestServiceInterface
         });
     }
 
-    private function buildAutoAllocation(int $id): array
-    {
-        $recommendation = $this->getRecommendation($id);
-
-        if (! $recommendation['is_fulfilled']) {
-            throw new \Exception(
-                "Stok di gudang IMC tidak mencukupi. Kurang: " .
-                    number_format($recommendation['remaining_qty'], 2, ',', '.')
-            );
-        }
-
-        return $recommendation['allocation'];
-    }
+    /* ================= TANDA TERIMA ================= */
 
     /**
-     * Alokasi manual — validasi ulang dari NOL terhadap kondisi stok
-     * TERKINI (bukan percaya begitu saja data dari form), supaya aman
-     * dari race condition atau manipulasi input.
+     * Buat tanda terima barang. Inilah yang mengubah approved →
+     * in_transit: stok sudah dipotong saat approve, tapi barang
+     * baru dianggap berangkat setelah dokumennya terbit.
      *
-     * $manualAllocation: [item_location_id => qty, ...]
+     * Cetak ulang tidak memanggil method ini — hanya menaikkan
+     * print_count lewat controller.
      */
-    private function buildManualAllocation(TransferRequest $request, array $manualAllocation): array
+    public function issueReceipt(int $id, int $issuedBy, array $data)
     {
-        $sourceWarehouseIds = array_values(array_diff(
-            $this->warehouseService->getIdsByDepartmentCode(TransferRequest::SOURCE_DEPARTMENT_CODE),
-            [(int) $request->destination_warehouse_id]
-        ));
+        return DB::transaction(function () use ($id, $issuedBy, $data) {
+            $this->transferRequestRepository->getByIdForUpdate($id);
+            $request = $this->transferRequestRepository->getById($id);
 
-        $allocation = [];
-        $totalQty   = 0.0;
+            $this->guardReceiptIssuer($issuedBy);
 
-        foreach ($manualAllocation as $itemLocationId => $qty) {
-            $qty = (float) $qty;
-
-            if ($qty <= 0) {
-                continue;
-            }
-
-            $lot = $this->itemLocationService->getById((int) $itemLocationId);
-
-            if ((int) $lot->item_id !== (int) $request->item_id) {
-                throw new \Exception("Lot #{$itemLocationId} bukan untuk item yang sama dengan request ini.");
-            }
-
-            if (! in_array((int) $lot->warehouse_id, $sourceWarehouseIds)) {
-                throw new \Exception("Lot #{$itemLocationId} bukan berasal dari gudang IMC yang sah.");
-            }
-
-            if ($qty > (float) $lot->qty_weight) {
+            if (! $request->isShippable()) {
                 throw new \Exception(
-                    "Qty yang diambil dari lot " . ($lot->vendor_lot ?? "#{$lot->id}") .
-                        " melebihi stok tersedia (" . number_format((float) $lot->qty_weight, 2, ',', '.') . ")."
+                    "Tanda terima hanya dapat dibuat untuk request yang sudah disetujui. " .
+                        "Status saat ini: " . strtoupper($request->status) . "."
                 );
             }
 
-            $allocation[] = ['item_location' => $lot, 'qty_to_take' => $qty];
-            $totalQty += $qty;
-        }
+            if ($request->receiptOfGoods) {
+                throw new \Exception("Tanda terima untuk request ini sudah pernah dibuat.");
+            }
 
-        if (empty($allocation)) {
-            throw new \Exception("Belum ada lot yang dipilih untuk dikirim.");
-        }
+            $letterDate = ! empty($data['letter_date'])
+                ? Carbon::parse($data['letter_date'])
+                : now();
 
-        $requestedQty = (float) $request->requested_qty;
+            ReceiptOfGoods::create([
+                'letter_number'       => $this->generateLetterNumber(),
+                'letter_date'         => $letterDate->toDateString(),
+                'transfer_request_id' => $request->id,
+                'responsibility_id'   => $issuedBy,
+                'photo'               => $data['photo'] ?? null,
+            ]);
 
-        // Toleransi kecil untuk pembulatan float
-        if (abs($totalQty - $requestedQty) > 0.01) {
-            throw new \Exception(
-                "Total qty yang dipilih (" . number_format($totalQty, 2, ',', '.') .
-                    ") harus sama persis dengan jumlah yang diminta (" .
-                    number_format($requestedQty, 2, ',', '.') . ")."
-            );
-        }
-
-        return $allocation;
+            return $this->transferRequestRepository->update($id, [
+                'status'      => TransferRequest::STATUS_IN_TRANSIT,
+                'shipped_by'  => $issuedBy,
+                'shipped_at'  => now(),
+                'print_count' => 1,
+            ]);
+        });
     }
+
+    /**
+     * Terbitkan tanda terima untuk beberapa request sekaligus.
+     *
+     * Semua ID divalidasi DULU sebelum ada yang diproses — kalau
+     * satu saja tidak memenuhi syarat, tidak ada nomor yang terbit.
+     * Ini disengaja: dokumen ini menerbitkan nomor resmi dan
+     * mengubah status, jadi melewati sebagian diam-diam berbahaya.
+     */
+
+    public function issueReceiptBatch(array $ids, int $issuedBy, string $letterDate): Collection
+    {
+        return DB::transaction(function () use ($ids, $issuedBy, $letterDate) {
+            $this->guardReceiptIssuer($issuedBy);
+
+            $date     = Carbon::parse($letterDate);
+            $requests = collect();
+            $errors   = [];
+
+            // --- Tahap 1: validasi semua ---
+            foreach ($ids as $id) {
+                $this->transferRequestRepository->getByIdForUpdate((int) $id);
+                $request = $this->transferRequestRepository->getById((int) $id);
+
+                if ($request->receiptOfGoods) {
+                    // Sudah punya tanda terima → dianggap cetak ulang,
+                    // bukan error. Ikut dicetak tanpa nomor baru.
+                    $requests->push($request);
+                    continue;
+                }
+
+                if (! $request->isShippable()) {
+                    $errors[] = "{$request->transfer_code} (" . strtoupper($request->status) . ")";
+                    continue;
+                }
+
+                $requests->push($request);
+            }
+
+            if (! empty($errors)) {
+                throw new \Exception(
+                    "Tanda terima hanya dapat dibuat untuk request yang sudah disetujui. " .
+                        "Belum memenuhi syarat: " . implode(', ', $errors) . "."
+                );
+            }
+
+            if ($requests->isEmpty()) {
+                throw new \Exception("Tidak ada request yang dapat dicetak.");
+            }
+
+            // --- Tahap 2: terbitkan ---
+            foreach ($requests as $request) {
+                if ($request->receiptOfGoods) {
+                    $request->increment('print_count');
+                    continue;
+                }
+
+                ReceiptOfGoods::create([
+                    'letter_number'       => $this->generateLetterNumber(),
+                    'letter_date'         => $date->toDateString(),
+                    'transfer_request_id' => $request->id,
+                    'responsibility_id'   => $issuedBy,
+                ]);
+
+                $this->transferRequestRepository->update($request->id, [
+                    'status'      => TransferRequest::STATUS_IN_TRANSIT,
+                    'shipped_by'  => $issuedBy,
+                    'shipped_at'  => now(),
+                    'print_count' => 1,
+                ]);
+            }
+
+            // Muat ulang supaya relasi receiptOfGoods yang baru ikut terbaca.
+            return $requests->map(
+                fn($r) => $this->transferRequestRepository->getById($r->id)
+            );
+        });
+    }
+
+    public function markPrinted(array $ids): void
+    {
+        TransferRequest::whereIn('id', $ids)->increment('print_count');
+    }
+
+    /**
+     * Nomor tanda terima: 0001/IMC/VIII/2026, reset tiap tahun.
+     *
+     * Diurutkan berdasarkan NOMOR, bukan letter_date — karena
+     * letter_date boleh di-backdate, mengurutkan pakai tanggal
+     * bisa menghasilkan nomor yang sudah terpakai.
+     *
+     * Harus dipanggil di dalam DB::transaction() supaya lock-nya
+     * bertahan sampai baris baru tersimpan.
+     */
+    private function generateLetterNumber(): string
+    {
+        $now   = now();
+        $tahun = $now->format('Y');
+        $bulan = $this->bulanRomawi((int) $now->format('n'));
+
+        $last = ReceiptOfGoods::withTrashed()
+            ->where('letter_number', 'like', '%/' . $tahun)
+            ->orderByRaw('CAST(SUBSTRING_INDEX(letter_number, "/", 1) AS UNSIGNED) DESC')
+            ->lockForUpdate()
+            ->first();
+
+        $nomor = $last
+            ? ((int) explode('/', $last->letter_number)[0]) + 1
+            : 1;
+
+        return str_pad($nomor, 4, '0', STR_PAD_LEFT) . "/IMC/{$bulan}/{$tahun}";
+    }
+
+    private function bulanRomawi(int $bulan): string
+    {
+        return [
+            1 => 'I',
+            2 => 'II',
+            3 => 'III',
+            4 => 'IV',
+            5 => 'V',
+            6 => 'VI',
+            7 => 'VII',
+            8 => 'VIII',
+            9 => 'IX',
+            10 => 'X',
+            11 => 'XI',
+            12 => 'XII',
+        ][$bulan] ?? '';
+    }
+
+    /* ================= RECEIVE ================= */
 
     public function receive(int $id, int $receivedBy, ?string $effectiveDate = null)
     {
         return DB::transaction(function () use ($id, $receivedBy, $effectiveDate) {
+            $this->transferRequestRepository->getByIdForUpdate($id);
             $request = $this->transferRequestRepository->getById($id);
 
-            if ($request->status !== TransferRequest::STATUS_IN_TRANSIT) {
+            if (! $request->isReceivable()) {
                 throw new \Exception("Barang belum dikirim atau sudah diterima sebelumnya.");
             }
 
-            $transDate = $effectiveDate ? Carbon::parse($effectiveDate) : now();
+            $this->guardReceiver($receivedBy, $request);
 
+            $transDate       = $effectiveDate ? Carbon::parse($effectiveDate) : now();
             $destWarehouseId = (int) $request->destination_warehouse_id;
+            $demanderId      = (int) $request->department_id;
 
-            // Lot baru di gudang tujuan diperuntukan bagi department yang
-            // MENGAJUKAN transfer ini — bukan department asal lot sumber.
-            $demanderId = $request->department_id;
-
-            // bb_qty = stok gudang tujuan SEBELUM barang ini masuk
-            $bbQty = $this->itemLocationService->getTotalStock((int) $request->item_id, $destWarehouseId);
+            $bbQty = $this->itemLocationService->getTotalStock(
+                (int) $request->item_id,
+                $destWarehouseId,
+                $demanderId
+            );
 
             $details  = $this->transferRequestRepository->getDetails($id);
             $totalQty = 0.0;
 
             foreach ($details as $detail) {
-                $destLot = $this->itemLocationService->addOrMergeLot(
-                    (int) $request->item_id,
-                    $destWarehouseId,
-                    [
-                        'demander_id'     => $demanderId,
-                        'vendor_lot'      => $detail->vendor_lot,
-                        'exp_date'        => $detail->exp_date?->toDateString(),
-                        'production_date' => $detail->production_date?->toDateString(),
-                        'package'         => $detail->package,
-                        'qty_weight'      => $detail->qty_taken,
-                        'qty_unit'        => $detail->qty_unit,
-                        'received_date'   => $transDate->toDateString(),
-                    ]
-                );
+                // Lot baru, TIDAK digabung dengan lot lama — supaya
+                // jejak tiap pengiriman tetap terlihat dan FEFO di
+                // gudang tujuan tidak kabur.
+                $destLot = $this->itemLocationService->addLot([
+                    'item_id'         => $request->item_id,
+                    'warehouse_id'    => $destWarehouseId,
+                    'demander_id'     => $demanderId,
+                    'vendor_lot'      => $detail->vendor_lot,
+                    'receiving_lot'   => $detail->receiving_lot,
+                    'exp_date'        => $detail->exp_date?->toDateString(),
+                    'production_date' => $detail->production_date?->toDateString(),
+                    'package'         => $detail->package,
+                    'qty_perpackage'  => $detail->qty_perpackage,
+                    'qty_package'     => $detail->package_taken,
+                    'received_date'   => $transDate->toDateString(),
+                    'is_warehouse_stock' => true,
+                ]);
 
                 $detail->update(['dest_item_location_id' => $destLot->id]);
 
                 $totalQty += (float) $detail->qty_taken;
             }
 
-            $ebQty = $bbQty + $totalQty;
-
             $this->stockLedgerService->record([
                 'item_id'      => $request->item_id,
                 'warehouse_id' => $destWarehouseId,
                 'trans_date'   => $transDate->toDateString(),
-                'in_qty'       => $totalQty,
+                'in_qty'       => round($totalQty, 2),
                 'out_qty'      => 0,
                 'bb_qty'       => $bbQty,
-                'eb_qty'       => $ebQty,
+                'eb_qty'       => round($bbQty + $totalQty, 2),
                 'doc_type'     => StockLedger::DOC_TRANSFER_IN,
                 'ref_type'     => StockLedger::REF_TRANSFER_IN,
                 'ref_id'       => $request->id,
@@ -305,78 +430,197 @@ class TransferRequestService implements TransferRequestServiceInterface
         });
     }
 
+    /* ================= REJECT / CANCEL ================= */
+
     public function reject(int $id, int $rejectedBy, string $reason)
     {
-        $request = $this->transferRequestRepository->getById($id);
+        return DB::transaction(function () use ($id, $rejectedBy, $reason) {
+            $this->transferRequestRepository->getByIdForUpdate($id);
+            $request = $this->transferRequestRepository->getById($id);
 
-        $this->guardApprover($rejectedBy);
+            $this->guardApprover($rejectedBy);
 
-        if ($request->status !== TransferRequest::STATUS_NEW) {
-            throw new \Exception("Request ini sudah diproses, tidak dapat ditolak.");
-        }
+            if ($request->status !== TransferRequest::STATUS_NEW) {
+                throw new \Exception("Request ini sudah diproses, tidak dapat ditolak.");
+            }
 
-        return $this->transferRequestRepository->update($id, [
-            'status'        => TransferRequest::STATUS_REJECTED,
-            'rejected_by'   => $rejectedBy,
-            'rejected_at'   => now(),
-            'reject_reason' => $reason,
-        ]);
+            return $this->transferRequestRepository->update($id, [
+                'status'        => TransferRequest::STATUS_REJECTED,
+                'rejected_by'   => $rejectedBy,
+                'rejected_at'   => now(),
+                'reject_reason' => $reason,
+            ]);
+        });
     }
 
     public function cancel(int $id, int $cancelledBy)
     {
-        $request = $this->transferRequestRepository->getById($id);
+        return DB::transaction(function () use ($id, $cancelledBy) {
+            $this->transferRequestRepository->getByIdForUpdate($id);
+            $request = $this->transferRequestRepository->getById($id);
 
-        if ((int) $request->requested_by !== $cancelledBy) {
-            throw new \Exception("Hanya pembuat request yang dapat membatalkan.");
-        }
+            if ((int) $request->requested_by !== $cancelledBy) {
+                throw new \Exception("Hanya pembuat request yang dapat membatalkan.");
+            }
 
-        if (! $request->isCancellable()) {
-            throw new \Exception("Request tidak dapat dibatalkan karena sudah diproses.");
-        }
+            if (! $request->isCancellable()) {
+                throw new \Exception("Request tidak dapat dibatalkan karena sudah diproses.");
+            }
 
-        return $this->transferRequestRepository->update($id, [
-            'status'       => TransferRequest::STATUS_CANCELLED,
-            'cancelled_by' => $cancelledBy,
-            'cancelled_at' => now(),
-        ]);
+            return $this->transferRequestRepository->update($id, [
+                'status'       => TransferRequest::STATUS_CANCELLED,
+                'cancelled_by' => $cancelledBy,
+                'cancelled_at' => now(),
+            ]);
+        });
     }
 
-    public function getAvailableLots(int $id): array
+    /* ================= PRIVATE ================= */
+
+    /**
+     * Gudang IMC sebagai sumber transfer.
+     *
+     * Gudang tujuan dikecualikan untuk kasus IMC memindahkan barang
+     * antar gudangnya sendiri — supaya tidak "mengirim" dari dan ke
+     * gudang yang sama.
+     */
+    private function sourceWarehouseIds($destinationWarehouseId = null): array
     {
-        $request = $this->transferRequestRepository->getById($id);
+        $ids = $this->warehouseService->getIdsByDepartmentCode(Department::CODE_IMC);
 
-        $sourceWarehouseIds = array_values(array_diff(
-            $this->warehouseService->getIdsByDepartmentCode(TransferRequest::SOURCE_DEPARTMENT_CODE),
-            [(int) $request->destination_warehouse_id]
-        ));
-
-        $lots = $this->itemLocationService->getAvailableLotsAcrossWarehouses(
-            (int) $request->item_id,
-            $sourceWarehouseIds
-        );
-
-        // Simulasikan FEFO di atas daftar lengkap ini, murni untuk saran
-        // pre-fill di form — tidak ada stok yang benar-benar dipotong.
-        $remaining    = (float) $request->requested_qty;
-        $suggestions  = [];
-
-        foreach ($lots as $lot) {
-            $take = $remaining > 0 ? min((float) $lot->qty_weight, $remaining) : 0;
-            $suggestions[$lot->id] = $take;
-            $remaining -= $take;
+        if ($destinationWarehouseId) {
+            $ids = array_diff($ids, [(int) $destinationWarehouseId]);
         }
 
-        return [
-            'lots'        => $lots,
-            'suggestions' => $suggestions,
-        ];
+        return array_values($ids);
+    }
+
+    private function buildAutoAllocation(int $id)
+    {
+        $rec = $this->getRecommendation($id);
+
+        if (! $rec['is_fulfilled']) {
+            throw new \Exception(
+                "Stok tidak mencukupi. Kurang " .
+                    number_format($rec['shortage'], 2, ',', '.') . " package."
+            );
+        }
+
+        return $rec['allocation']->lines;
+    }
+
+    /**
+     * Alokasi manual divalidasi ulang dari NOL terhadap stok terkini —
+     * data dari form tidak dipercaya begitu saja.
+     *
+     * $manualAllocation: [item_location_id => jumlah_package, ...]
+     */
+    private function buildManualAllocation(TransferRequest $request, array $manualAllocation)
+    {
+        $sourceIds  = $this->sourceWarehouseIds($request->destination_warehouse_id);
+        $perPackage = (float) $request->requested_perpackage;
+
+        $lines        = collect();
+        $totalPackage = 0.0;
+
+        foreach ($manualAllocation as $lotId => $package) {
+            $package = (float) $package;
+
+            if ($package <= 0) {
+                continue;
+            }
+
+            if (floor($package) != $package) {
+                throw new \Exception("Jumlah package harus bilangan bulat — kemasan di IMC tidak boleh terbuka.");
+            }
+
+            $lot = $this->itemLocationService->getById((int) $lotId);
+
+            if ((int) $lot->item_id !== (int) $request->item_id) {
+                throw new \Exception("Lot #{$lotId} bukan untuk item yang sama dengan request ini.");
+            }
+
+            if ((int) $lot->demander_id !== (int) $request->department_id) {
+                throw new \Exception("Lot #{$lotId} bukan milik department pemohon.");
+            }
+
+            if (! in_array((int) $lot->warehouse_id, $sourceIds, true)) {
+                throw new \Exception("Lot #{$lotId} bukan berasal dari gudang IMC yang sah.");
+            }
+
+            if ((float) $lot->qty_perpackage !== $perPackage) {
+                throw new \Exception(
+                    "Lot #{$lotId} ukurannya " . number_format((float) $lot->qty_perpackage, 2, ',', '.') .
+                        " kg, tidak sesuai permintaan " . number_format($perPackage, 2, ',', '.') . " kg."
+                );
+            }
+
+            $availablePackage = floor((float) $lot->qty_weight / $perPackage);
+
+            if ($package > $availablePackage) {
+                throw new \Exception(
+                    "Lot " . ($lot->receiving_lot ?? "#{$lot->id}") . " hanya tersedia " .
+                        $availablePackage . " package utuh."
+                );
+            }
+
+            $lines->push(new \App\Services\Dto\AllocationLine(
+                lot: $lot,
+                packageTaken: $package,
+                qtyTaken: round($package * $perPackage, 2),
+            ));
+
+            $totalPackage += $package;
+        }
+
+        if ($lines->isEmpty()) {
+            throw new \Exception("Belum ada lot yang dipilih untuk dikirim.");
+        }
+
+        if ($totalPackage != (float) $request->requested_package) {
+            throw new \Exception(
+                "Total package yang dipilih ({$totalPackage}) harus sama dengan yang diminta (" .
+                    (float) $request->requested_package . ")."
+            );
+        }
+
+        return $lines;
     }
 
     private function guardApprover(int $userId): void
     {
         if (! $this->transferRequestRepository->isApprover($userId)) {
-            throw new \Exception("Anda tidak memiliki wewenang untuk memproses Permintaan Kirim Barang .");
+            throw new \Exception("Anda tidak memiliki wewenang untuk memproses Permintaan Kirim Barang.");
+        }
+    }
+
+    /**
+     * Akses cetak diatur per user, bukan per role — di lapangan
+     * yang mengurus dokumen belum tentu orang yang sama dengan
+     * approver.
+     */
+    private function guardReceiptIssuer(int $userId): void
+    {
+        if (! User::findOrFail($userId)->canIssueReceipt()) {
+            throw new \Exception("Anda tidak memiliki akses untuk membuat tanda terima barang.");
+        }
+    }
+
+    /**
+     * Yang mengkonfirmasi terima harus dari department tujuan.
+     * Tanpa ini, siapa pun berpermission receive bisa mengkonfirmasi
+     * barang milik department lain.
+     */
+    private function guardReceiver(int $userId, TransferRequest $request): void
+    {
+        $user = User::findOrFail($userId);
+
+        if ($user->hasRole('admin')) {
+            return;
+        }
+
+        if ((int) $user->department_id !== (int) $request->department_id) {
+            throw new \Exception("Hanya department tujuan yang dapat mengkonfirmasi penerimaan barang.");
         }
     }
 }

@@ -72,14 +72,6 @@
             font-size: 7px;
         }
 
-        .unit-box {
-            border: 1px solid #000;
-            padding: 3px 5px;
-            text-align: center;
-            font-size: 8px;
-            margin-top: 3px;
-        }
-
         .tgl-line {
             font-size: 8px;
             margin: 6px 0;
@@ -163,6 +155,11 @@
             @foreach ($pageGroup as $row)
                 <tr>
                     @foreach ($row as $transferRequest)
+                        @php
+                            // Nomor & tanggal surat ada di receipt_of_goods,
+                            // bukan di transfer_requests.
+                            $rog = $transferRequest->receiptOfGoods;
+                        @endphp
                         <td class="grid-cell">
                             <div class="ttb-box">
                                 <table class="header-table">
@@ -170,50 +167,63 @@
                                         <td style="width: 68%;">
                                             <div class="title">TANDA TERIMA BARANG</div>
                                             <div class="no-line">
-                                                No. : <span
-                                                    class="no-value">{{ $transferRequest->letter_number ?? '.......' }}</span>
+                                                No. : <span class="no-value">
+                                                    {{ $rog->letter_number ?? '.......' }}
+                                                </span>
                                             </div>
                                         </td>
                                         <td style="width: 32%;">
                                             <div class="code-box">FO-IMC-PUR-11-06/00</div>
-
+                                        </td>
                                     </tr>
-
                                 </table>
 
                                 <div class="tgl-line">
-                                    TGL : ...........
+                                    TGL : {{ $rog?->letter_date?->format('d-m-Y') ?? '...........' }}
                                 </div>
+
                                 <table class="items-table">
                                     <thead>
                                         <tr>
                                             <th style="width: 6%;">NO</th>
-                                            <th style="width: 27%;">NAMA BARANG</th>
-                                            <th style="width: 15%;">NO.LOT</th>
-                                            <th style="width: 15%;">JUMLAH</th>
-                                            <th style="width: 15%;">SISA</th>
-                                            <th style="width: 22%;">KET</th>
+                                            <th style="width: 30%;">NAMA BARANG</th>
+                                            <th style="width: 17%;">NO.LOT</th>
+                                            <th style="width: 12%;">PKG</th>
+                                            <th style="width: 16%;">SISA STOCK</th>
+                                            <th style="width: 19%;">KET</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @php $totalRows = 15; @endphp
+                                        @php
+                                            $totalRows = 15;
+                                            $details = $transferRequest->details;
+                                            $itemName = $transferRequest->item->item_desc ?? '-';
+                                        @endphp
 
-                                        @foreach ($transferRequest->details as $i => $detail)
+                                        @foreach ($details as $i => $detail)
                                             @if ($i < $totalRows)
                                                 <tr>
                                                     <td>{{ $i + 1 }}</td>
-                                                    <td class="text-left">
-                                                        {{ $detail->itemLocation->item->item_desc ?? '-' }}</td>
-                                                    <td>{{ $detail->vendor_lot ?? '-' }}</td>
-                                                    <td>{{ number_format((float) $detail->qty_taken, 1, ',', '.') }}
+                                                    <td class="text-left">{{ $itemName }}</td>
+                                                    <td>{{ $detail->vendor_lot ?? ($detail->receiving_lot ?? '-') }}
                                                     </td>
-                                                    <td>{{ $detail->itemLocation->qty_available ?? '-' }}</td>
-                                                    <td class="text-left"></td>
+                                                    <td>{{ (int) $detail->package_taken }} {{ $detail->package ?? '-' }}
+                                                    </td>
+                                                    {{-- Sisa lot asal di gudang IMC setelah barang diambil --}}
+                                                    <td>
+                                                        {{ $detail->itemLocation ? number_format((float) $detail->itemLocation->qty_weight, 2, ',', '.') : '-' }}
+                                                        kg
+                                                    </td>
+                                                    <td class="text-left">
+                                                        @
+                                                        {{ number_format((float) $detail->qty_perpackage, 2, ',', '.') }}
+                                                        kg
+                                                    </td>
                                                 </tr>
                                             @endif
                                         @endforeach
 
-                                        @for ($i = min($transferRequest->details->count(), $totalRows); $i < $totalRows; $i++)
+                                        @for ($i = min($details->count(), $totalRows); $i < $totalRows; $i++)
                                             <tr>
                                                 <td>&nbsp;</td>
                                                 <td>&nbsp;</td>
@@ -223,6 +233,15 @@
                                                 <td>&nbsp;</td>
                                             </tr>
                                         @endfor
+
+                                        <tr>
+                                            <td colspan="3" style="text-align: right; font-weight: bold;">TOTAL</td>
+                                            <td style="font-weight: bold;">
+                                                {{ (int) $details->sum('package_taken') }}</td>
+                                            <td></td>
+                                            <td class="text-left" style="font-weight: bold;">
+                                                {{ number_format($details->sum('qty_taken'), 2, ',', '.') }} kg</td>
+                                        </tr>
                                     </tbody>
                                 </table>
 
@@ -232,8 +251,12 @@
                                         <td style="text-align: right;">Yang menyerahkan</td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align: left;">Sub Dept. :</td>
-                                        <td></td>
+                                        <td style="text-align: left;">
+                                            Sub Dept. : {{ $transferRequest->department->code ?? '-' }}
+                                        </td>
+                                        <td style="text-align: right;">
+                                            {{ $rog->responsibility->name ?? '-' }}
+                                        </td>
                                     </tr>
                                 </table>
 
@@ -254,7 +277,9 @@
                                     </tr>
                                 </table>
 
-                                <div class="footnote">*Harap tulis nama jelas</div>
+                                <div class="footnote">
+                                    *Harap tulis nama jelas
+                                </div>
                             </div>
                         </td>
                     @endforeach

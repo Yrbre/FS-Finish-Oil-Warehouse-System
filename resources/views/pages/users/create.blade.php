@@ -94,6 +94,13 @@
                                 tertentu.
                             </small>
                         </div>
+                        <div class="custom-control custom-checkbox mb-3">
+                            <input type="checkbox" class="custom-control-input" id="can_issue_receipt"
+                                name="can_issue_receipt" value="1" {{ old('can_issue_receipt') ? 'checked' : '' }}>
+                            <label class="custom-control-label" for="can_issue_receipt">
+                                Boleh membuat & mencetak Tanda Terima Barang
+                            </label>
+                        </div>
 
                         <div class="mt-4">
                             <button type="submit" class="btn btn-primary">

@@ -23,6 +23,7 @@ class User extends Authenticatable
         'email',
         'password',
         'department_id',
+        'can_issue_receipt',
     ];
 
     /**
@@ -43,6 +44,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'can_issue_receipt' => 'boolean',
     ];
 
     public function department()
@@ -64,5 +66,10 @@ class User extends Authenticatable
     public function isTransferApprover(): bool
     {
         return $this->transferApprover()->exists();
+    }
+
+    public function canIssueReceipt(): bool
+    {
+        return (bool) $this->can_issue_receipt;
     }
 }

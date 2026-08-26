@@ -35,8 +35,11 @@ class TransferRequestRepository implements TransferRequestRepositoryInterface
             'requester',
             'approver',
             'receiver',
+            'shipper',
+            'receiptOfGoods.responsibility',
             'details.itemLocation',
             'details.sourceWarehouse',
+            'details.itemLocation',
         ])->findOrFail($id);
     }
 
@@ -60,7 +63,9 @@ class TransferRequestRepository implements TransferRequestRepositoryInterface
 
     public function createDetails(array $details): void
     {
-        TransferRequestDetail::insert($details);
+        foreach ($details as $detail) {
+            TransferRequestDetail::create($detail);
+        }
     }
 
     public function getDetails(int $transferRequestId)
@@ -73,5 +78,10 @@ class TransferRequestRepository implements TransferRequestRepositoryInterface
     public function isApprover(int $userId): bool
     {
         return TransferApprover::where('user_id', $userId)->exists();
+    }
+
+    public function getByIdForUpdate(int $id)
+    {
+        return $this->model->lockForUpdate()->findOrFail($id);
     }
 }
