@@ -211,7 +211,7 @@
                                                     </td>
                                                     {{-- Sisa lot asal di gudang IMC setelah barang diambil --}}
                                                     <td>
-                                                        {{ $detail->itemLocation ? number_format((float) $detail->itemLocation->qty_weight, 2, ',', '.') : '-' }}
+                                                        {{ number_format((float) $detail->remaining_weight, 1, ',', '.') }}
                                                         kg
                                                     </td>
                                                     <td class="text-left">

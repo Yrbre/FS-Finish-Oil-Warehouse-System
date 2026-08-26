@@ -266,6 +266,7 @@
                                         <th>Exp Date</th>
                                         <th class="text-right">Package</th>
                                         <th class="text-right">Berat</th>
+                                        <th class="text-right">Sisa di Asal</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -279,6 +280,13 @@
                                             <td class="text-right">{{ (int) $detail->package_taken }} pkg</td>
                                             <td class="text-right">
                                                 {{ number_format((float) $detail->qty_taken, 2, ',', '.') }} kg</td>
+                                            <td class="text-right">
+                                                {{ (int) $detail->remaining_package }} pkg
+                                                <br>
+                                                <small class="text-muted">
+                                                    {{ number_format((float) $detail->remaining_weight, 2, ',', '.') }} kg
+                                                </small>
+                                            </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -289,6 +297,9 @@
                                             {{ (int) $transferRequest->details->sum('package_taken') }} pkg</td>
                                         <td class="text-right">
                                             {{ number_format($transferRequest->details->sum('qty_taken'), 2, ',', '.') }}
+                                            kg</td>
+                                        <td class="text-right">
+                                            {{ number_format($transferRequest->details->sum('remaining_weight'), 2, ',', '.') }}
                                             kg</td>
                                     </tr>
                                 </tfoot>

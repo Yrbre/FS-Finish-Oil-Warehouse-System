@@ -28,6 +28,12 @@ return new class extends Migration
             $table->decimal('package_taken', 15, 2);
             $table->decimal('qty_taken', 15, 2);
 
+            // Sisa lot asal SETELAH barang ini diambil, dibekukan saat
+            // approve. Tanpa snapshot, cetak ulang TTB akan menampilkan
+            // sisa terkini — bukan kondisi saat barang dikirim.
+            $table->decimal('remaining_weight', 15, 2)->default(0);
+            $table->decimal('remaining_package', 15, 2)->default(0);
+
             // FK ini sebelumnya tidak ada, jadi bisa menunjuk lot yang
             // sudah terhapus tanpa ketahuan.
             $table->foreignId('dest_item_location_id')->nullable()

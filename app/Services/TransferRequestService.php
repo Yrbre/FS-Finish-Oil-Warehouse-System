@@ -146,10 +146,11 @@ class TransferRequestService implements TransferRequestServiceInterface
                 $totalTaken = 0.0;
 
                 foreach ($rows as $line) {
-                    $this->itemLocationService->deductLot($line->lot->id, $line->qtyTaken);
-                    $totalTaken += $line->qtyTaken;
 
                     $details[] = $line->toDetailArray($request->id);
+
+                    $this->itemLocationService->deductLot($line->lot->id, $line->qtyTaken);
+                    $totalTaken += $line->qtyTaken;
                 }
 
                 $this->stockLedgerService->record([

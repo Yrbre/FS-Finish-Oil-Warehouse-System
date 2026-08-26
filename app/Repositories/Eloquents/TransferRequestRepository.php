@@ -39,7 +39,6 @@ class TransferRequestRepository implements TransferRequestRepositoryInterface
             'receiptOfGoods.responsibility',
             'details.itemLocation',
             'details.sourceWarehouse',
-            'details.itemLocation',
         ])->findOrFail($id);
     }
 

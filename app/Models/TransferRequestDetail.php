@@ -21,6 +21,8 @@ class TransferRequestDetail extends Model
         'qty_perpackage',
         'package_taken',
         'qty_taken',
+        'remaining_weight',
+        'remaining_package',
         'dest_item_location_id',
     ];
 
@@ -30,6 +32,8 @@ class TransferRequestDetail extends Model
         'qty_perpackage'  => 'decimal:4',
         'package_taken'   => 'decimal:2',
         'qty_taken'       => 'decimal:2',
+        'remaining_weight'  => 'decimal:2',
+        'remaining_package' => 'decimal:2',
     ];
 
     public function transferRequest()

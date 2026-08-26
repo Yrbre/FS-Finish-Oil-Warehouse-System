@@ -23,6 +23,11 @@ class AllocationLine
      */
     public function toDetailArray(int $transferRequestId): array
     {
+        // Sisa lot setelah baris ini diambil. $this->lot masih memuat
+        // nilai SEBELUM deductLot() dijalankan, jadi dikurangi manual.
+        $remainingWeight = round((float) $this->lot->qty_weight - $this->qtyTaken, 2);
+        $perPackage      = (float) $this->lot->qty_perpackage;
+
         return [
             'transfer_request_id' => $transferRequestId,
             'item_location_id'    => $this->lot->id,
@@ -32,9 +37,13 @@ class AllocationLine
             'exp_date'            => $this->lot->exp_date?->toDateString(),
             'production_date'     => $this->lot->production_date?->toDateString(),
             'package'             => $this->lot->package,
-            'qty_perpackage'      => $this->lot->qty_perpackage,
+            'qty_perpackage'      => $perPackage,
             'package_taken'       => $this->packageTaken,
             'qty_taken'           => $this->qtyTaken,
+            'remaining_weight'    => max($remainingWeight, 0),
+            'remaining_package'   => $perPackage > 0
+                ? floor(max($remainingWeight, 0) / $perPackage)
+                : 0,
             'created_at'          => now(),
             'updated_at'          => now(),
         ];
