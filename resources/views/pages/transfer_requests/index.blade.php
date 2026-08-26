@@ -8,12 +8,14 @@
                 <div class="col">
                     <h2 class="h5 page-title">Permintaan Kirim Barang</h2>
                 </div>
-                <div class="col-auto">
-                    <button type="button" id="btn-cetak-terpilih" class="btn btn-warning" disabled>
-                        <span class="fe fe-printer fe-16 mr-2"></span>
-                        Cetak TTB Terpilih (<span id="jumlah-terpilih">0</span>)
-                    </button>
-                </div>
+                @if (auth()->user()->canIssueReceipt())
+                    <div class="col-auto">
+                        <button type="button" id="btn-cetak-terpilih" class="btn btn-warning" disabled>
+                            <span class="fe fe-printer fe-16 mr-2"></span>
+                            Cetak TTB Terpilih (<span id="jumlah-terpilih">0</span>)
+                        </button>
+                    </div>
+                @endif
                 @can('transfer-requests.create')
                     <div class="col-auto">
                         <a href="{{ route('transfer-requests.create') }}" class="btn btn-primary btn-sm">
@@ -67,6 +69,42 @@
                     </div>
                 </div>
             </div>
+
+            {{-- Modal cetak batch — letter_date wajib karena tanggal ini
+         yang tercetak di dokumen dan boleh di-backdate. --}}
+            <div class="modal fade" id="cetakBatchModal" tabindex="-1" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Cetak Tanda Terima Barang</h5>
+                            <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>
+                                <strong id="modal-jumlah">0</strong> permintaan akan dicetak.
+                            </p>
+                            <div class="alert alert-info small mb-3">
+                                Permintaan yang belum punya tanda terima akan diterbitkan nomornya
+                                dan statusnya berubah menjadi <strong>dalam perjalanan</strong>.
+                                Semua permintaan harus sudah berstatus <strong>approved</strong>.
+                            </div>
+                            <div class="form-group mb-0">
+                                <label>Tanggal Kirim <span class="text-danger">*</span></label>
+                                <input type="date" id="modal-letter-date" class="form-control"
+                                    value="{{ now()->toDateString() }}" required>
+                                <small class="form-text text-muted">Tanggal yang tercetak di dokumen.</small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-light" data-dismiss="modal">Batal</button>
+                            <button type="button" class="btn btn-warning" id="btn-konfirmasi-cetak">
+                                <span class="fe fe-printer fe-16 mr-2"></span>Cetak
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
 
         </div>
     </div>
@@ -169,24 +207,71 @@
                 $('#dataTableTransferRequest .row-checkbox').prop('checked', checked).trigger('change');
             });
 
-            // reset centang tiap kali data di-reload (ganti halaman/filter)
-            // biar checkbox "select all" ikut ke-uncheck otomatis
+            // Reset centang tiap kali data di-reload (ganti halaman,
+            // filter, atau setelah cetak).
             table.on('draw', function() {
                 $('#check-all').prop('checked', false);
+
+                // Kembalikan centang baris yang masih terpilih —
+                // supaya pilihan lintas halaman tidak hilang.
+                $('#dataTableTransferRequest .row-checkbox').each(function() {
+                    $(this).prop('checked', selectedIds.has($(this).val()));
+                });
+
+                updateTombolCetak();
             });
 
             // klik tombol cetak
+            // Buka modal untuk mengisi tanggal kirim
             $('#btn-cetak-terpilih').on('click', function() {
                 if (selectedIds.size === 0) return;
 
-                let container = $('#hidden-ids-container');
+                $('#modal-jumlah').text(selectedIds.size);
+                $('#cetakBatchModal').modal('show');
+            });
+
+            $('#btn-konfirmasi-cetak').on('click', function() {
+                const letterDate = $('#modal-letter-date').val();
+
+                if (!letterDate) {
+                    $('#modal-letter-date').addClass('is-invalid').focus();
+                    return;
+                }
+
+                const container = $('#hidden-ids-container');
                 container.empty();
+
+                // Tanggal ikut dibuat di sini, bukan mengandalkan hidden
+                // input terpisah — modal bisa dipindah Bootstrap ke luar
+                // form dan nilainya jadi tidak terkirim.
+                container.append(
+                    `<input type="hidden" name="letter_date" value="${letterDate}">`
+                );
 
                 selectedIds.forEach(function(id) {
                     container.append(`<input type="hidden" name="ids[]" value="${id}">`);
                 });
 
                 $('#form-cetak-batch').submit();
+                $('#cetakBatchModal').modal('hide');
+
+                Swal.fire({
+                    title: 'Memproses...',
+                    text: 'Tanda terima dibuka di tab baru.',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading(),
+                });
+
+                setTimeout(function() {
+                    selectedIds.clear();
+                    updateTombolCetak();
+                    Swal.close();
+                    table.ajax.reload(null, false);
+                }, 1800);
+            });
+
+            $('#modal-letter-date').on('input', function() {
+                $(this).removeClass('is-invalid');
             });
         });
     </script>

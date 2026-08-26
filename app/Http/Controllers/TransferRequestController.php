@@ -266,11 +266,23 @@ class TransferRequestController extends Controller
 
             $this->transferRequestService->issueReceipt((int) $id, auth()->id(), $data);
 
-            return redirect()->route('transfer-requests.receipt', $id);
+            // Langsung kembalikan PDF — form-nya target="_blank", jadi
+            // dokumen terbuka di tab baru sementara tab asal di-refresh
+            // oleh JS untuk menampilkan status terbaru.
+            $transferRequest = $this->transferRequestService->getById((int) $id);
+            $transferRequests = collect([$transferRequest]);
+
+            $pdf = Pdf::loadView('pdf.receipt-of-goods', compact('transferRequests'))
+                ->setPaper('letter', 'portrait');
+
+            return $pdf->stream('tanda-terima-' . $transferRequest->transfer_code . '.pdf');
         } catch (\Exception $e) {
             Log::error('Gagal membuat tanda terima: ' . $e->getMessage());
 
-            return redirect()->back()->with('error', $e->getMessage())->withInput();
+            // Error tampil di tab baru karena form target="_blank".
+            return response()->view('pages.transfer_requests.receipt_error', [
+                'message' => $e->getMessage(),
+            ], 422);
         }
     }
 
@@ -311,11 +323,17 @@ class TransferRequestController extends Controller
     {
         $user = auth()->user();
 
-        if ($user->hasRole('admin') || $user->can('transfer-requests.approve')) {
+        // Petugas penerbit tanda terima perlu akses ke semua request
+        // untuk mencetak dokumennya, meski bukan pemohon maupun approver.
+        if (
+            $user->hasRole('admin')
+            || $user->can('transfer-requests.approve')
+            || $user->canIssueReceipt()
+        ) {
             return;
         }
 
-        $milikSendiri  = (int) $transferRequest->requested_by === (int) $user->id;
+        $milikSendiri   = (int) $transferRequest->requested_by === (int) $user->id;
         $departmentSama = (int) $transferRequest->department_id === (int) $user->department_id;
 
         if (! $milikSendiri && ! $departmentSama) {

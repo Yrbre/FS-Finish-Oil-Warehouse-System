@@ -322,7 +322,7 @@
                                 setelah tanda terima diterbitkan.
                             </p>
                             <form action="{{ route('transfer-requests.issue-receipt', $transferRequest->id) }}"
-                                method="POST" enctype="multipart/form-data" id="receiptForm">
+                                method="POST" enctype="multipart/form-data" id="receiptForm" target="_blank">
                                 @csrf
                                 <div class="form-row">
                                     <div class="form-group col-md-4">
@@ -522,10 +522,44 @@
             });
         }
 
+        // Tanda terima dibuka di tab baru (target="_blank"), lalu tab
+        // ini di-refresh supaya status & nomor surat terbaru muncul.
+        const receiptForm = document.getElementById('receiptForm');
+        if (receiptForm) {
+            receiptForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const target = this;
+
+                Swal.fire({
+                    title: 'Terbitkan tanda terima?',
+                    text: 'Nomor surat akan diterbitkan dan status berubah menjadi dalam perjalanan.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, terbitkan',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#007bff',
+                    reverseButtons: true,
+                }).then((result) => {
+                    if (!result.isConfirmed) return;
+
+                    target.submit();
+
+                    // Beri jeda supaya request sempat terkirim sebelum
+                    // halaman dimuat ulang.
+                    Swal.fire({
+                        title: 'Memproses...',
+                        text: 'Tanda terima dibuka di tab baru.',
+                        allowOutsideClick: false,
+                        didOpen: () => Swal.showLoading(),
+                    });
+
+                    setTimeout(() => window.location.reload(), 1500);
+                });
+            });
+        }
+
         confirmSubmit('#approveForm', 'Approve permintaan ini?',
             'Stok akan dipotong dari lot yang dipilih.', 'Ya, approve', '#28a745');
-        confirmSubmit('#receiptForm', 'Terbitkan tanda terima?',
-            'Nomor surat akan diterbitkan dan status berubah menjadi dalam perjalanan.', 'Ya, terbitkan', '#007bff');
         confirmSubmit('.form-receive', 'Konfirmasi barang sampai?',
             'Stok akan masuk ke gudang tujuan.', 'Ya, terima', '#28a745');
         confirmSubmit('.form-cancel', 'Batalkan request ini?',
