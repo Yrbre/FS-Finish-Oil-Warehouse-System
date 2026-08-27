@@ -46,6 +46,16 @@
                         </div>
 
                         <div class="form-group">
+                            <label>Minimum Stock (KG)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" name="min_stock"
+                                value="{{ old('min_stock') }}">
+                            <small class="form-text text-muted">
+                                Ambang peringatan per department: stok di gudang sendiri + titipan di IMC.
+                                Kosongkan bila item ini tidak perlu dipantau.
+                            </small>
+                        </div>
+
+                        <div class="form-group">
                             <label for="item_uom">Satuan (UOM) <span class="text-danger">*</span></label>
                             <input type="text" class="form-control uppercase @error('item_uom') is-invalid @enderror"
                                 id="item_uom" name="item_uom" value="{{ old('item_uom', 'KG') }}" placeholder="Contoh: KG"

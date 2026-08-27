@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemLocationController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
@@ -254,6 +255,18 @@ Route::middleware('auth')->group(function () {
 */
 Route::middleware(['auth', 'can:reports.view'])->group(function () {
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Notifikasi
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('notifications/latest', [NotificationController::class, 'latest'])->name('notifications.latest');
+    Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::get('notifications/{id}/read', [NotificationController::class, 'read'])->name('notifications.read');
 });
 
 require __DIR__ . '/auth.php';

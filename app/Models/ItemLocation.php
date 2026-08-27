@@ -32,19 +32,21 @@ class ItemLocation extends Model
         'disposed_at',
         'disposed_by',
         'disposal_reason',
+        'expiry_alerted_level',
     ];
 
     protected $casts = [
-        'production_date'     => 'date',
-        'exp_date'            => 'date',
-        'exp_by_receiving_at' => 'date',
-        'received_date'       => 'date',
-        'disposed_at'         => 'datetime',
-        'qty_perpackage'      => 'decimal:4',
-        'qty_package'         => 'decimal:2',
-        'qty_weight'          => 'decimal:2',
-        'initial_weight' => 'decimal:2',
-        'is_warehouse_stock'  => 'boolean',
+        'production_date'       => 'date',
+        'exp_date'              => 'date',
+        'exp_by_receiving_at'   => 'date',
+        'received_date'         => 'date',
+        'disposed_at'           => 'datetime',
+        'qty_perpackage'        => 'decimal:4',
+        'qty_package'           => 'decimal:2',
+        'qty_weight'            => 'decimal:2',
+        'initial_weight'        => 'decimal:2',
+        'is_warehouse_stock'    => 'boolean',
+        'expiry_alerted_level'  => 'integer',
     ];
 
     public function item()

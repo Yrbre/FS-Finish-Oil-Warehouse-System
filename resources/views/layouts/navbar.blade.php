@@ -106,11 +106,17 @@
                             class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">Laporan</a>
                     </li>
                 @endcan
-
+                <li class="nav-item">
+                    <a href="{{ route('notifications.index') }}"
+                        class="nav-link {{ request()->routeIs('notifications.*') ? 'active' : '' }}">
+                        Notifikasi
+                    </a>
+                </li>
             </ul>
         </div>
 
         <ul class="navbar-nav d-flex flex-row">
+            @include('components.notification-bell')
             <li class="nav-item dropdown ml-lg-0">
                 <a class="nav-link dropdown-toggle text-muted" href="#" id="navbarDropdownMenuLink" role="button"
                     data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">

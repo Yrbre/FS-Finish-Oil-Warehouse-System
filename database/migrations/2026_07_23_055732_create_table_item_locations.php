@@ -48,6 +48,10 @@ return new class extends Migration
             $table->timestamp('disposed_at')->nullable();
             $table->foreignId('disposed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->text('disposal_reason')->nullable();
+            // Tingkat peringatan expired yang SUDAH dikirim (3, 2, atau 1).
+            // Tanpa ini, scheduler harian akan mengirim notifikasi yang
+            // sama setiap hari selama lot mendekati kedaluwarsa.
+            $table->unsignedTinyInteger('expiry_alerted_level')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
