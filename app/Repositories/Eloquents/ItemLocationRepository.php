@@ -161,19 +161,30 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
             ->groupBy('qty_perpackage')
             ->orderBy('qty_perpackage')
             ->get()
-            ->map(function ($row) {
+            ->map(function ($row) use ($itemId, $demanderId) {
                 $per = (float) $row->qty_perpackage;
+
+                $physical = $per > 0 ? floor((float) $row->total_weight / $per) : 0;
+
+                // Kurangi yang sudah dipesan request lain yang masih
+                // menunggu — supaya staff tidak meminta stok yang
+                // sebenarnya sudah jadi jatah request sebelumnya.
+                $reserved = $this->getReservedPackage($itemId, $demanderId, $per);
 
                 return (object) [
                     'qty_perpackage'    => $per,
                     'package'           => $row->package,
                     'total_weight'      => (float) $row->total_weight,
-                    // Package utuh yang benar-benar bisa dikirim.
-                    'available_package' => $per > 0 ? floor((float) $row->total_weight / $per) : 0,
+                    'physical_package'  => $physical,
+                    'reserved_package'  => $reserved,
+                    'available_package' => max($physical - $reserved, 0),
                     'lot_count'         => (int) $row->lot_count,
                     'nearest_exp'       => $row->nearest_exp,
                 ];
-            });
+            })
+            // Ukuran yang habis terpesan tidak perlu ditampilkan.
+            ->filter(fn($row) => $row->available_package > 0)
+            ->values();
     }
 
     /* ================= REPORT ================= */
@@ -212,5 +223,32 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
             ->groupBy('warehouses.id', 'warehouses.name', 'warehouses.tag')
             ->orderBy('warehouses.name')
             ->get();
+    }
+
+    /**
+     * Package yang sudah "dipesan" oleh request lain yang masih new.
+     *
+     * Request berstatus new belum memotong stok, tapi sudah menjadi
+     * komitmen. Tanpa ini, dua request bisa sama-sama lolos validasi
+     * lalu salah satunya gagal saat approve.
+     *
+     * Sengaja tidak mengunci lot tertentu — lot mana yang diambil
+     * baru ditentukan FEFO saat approve.
+     */
+    public function getReservedPackage(
+        int $itemId,
+        int $demanderId,
+        float $perPackage,
+        ?int $excludeRequestId = null
+    ): float {
+        return (float) \App\Models\TransferRequestItem::query()
+            ->where('transfer_request_items.item_id', $itemId)
+            ->where('transfer_request_items.requested_perpackage', $perPackage)
+            ->where('transfer_request_items.status', \App\Models\TransferRequestItem::STATUS_NEW)
+            ->whereHas('transferRequest', function ($q) use ($demanderId, $excludeRequestId) {
+                $q->where('department_id', $demanderId)
+                    ->when($excludeRequestId, fn($q2) => $q2->where('id', '!=', $excludeRequestId));
+            })
+            ->sum('requested_package');
     }
 }

@@ -21,7 +21,7 @@ class AllocationLine
     /**
      * Bentuk array untuk disimpan ke transfer_request_details.
      */
-    public function toDetailArray(int $transferRequestId): array
+    public function toDetailArray(int $transferRequestItemId): array
     {
         // Sisa lot setelah baris ini diambil. $this->lot masih memuat
         // nilai SEBELUM deductLot() dijalankan, jadi dikurangi manual.
@@ -29,8 +29,8 @@ class AllocationLine
         $perPackage      = (float) $this->lot->qty_perpackage;
 
         return [
-            'transfer_request_id' => $transferRequestId,
-            'item_location_id'    => $this->lot->id,
+            'transfer_request_item_id' => $transferRequestItemId,
+            'item_location_id'         => $this->lot->id,
             'source_warehouse_id' => $this->lot->warehouse_id,
             'vendor_lot'          => $this->lot->vendor_lot,
             'receiving_lot'       => $this->lot->receiving_lot,

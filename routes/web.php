@@ -104,10 +104,6 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:item-locations.view')->group(function () {
         Route::get('item-locations', [ItemLocationController::class, 'index'])->name('item-locations.index');
     });
-    Route::middleware('can:item-locations.create')->group(function () {
-        Route::get('item-locations/create', [ItemLocationController::class, 'create'])->name('item-locations.create');
-        Route::post('item-locations', [ItemLocationController::class, 'store'])->name('item-locations.store');
-    });
     Route::middleware('can:item-locations.update')->group(function () {
         Route::get('item-locations/{id}/edit', [ItemLocationController::class, 'edit'])->name('item-locations.edit');
         Route::put('item-locations/{id}', [ItemLocationController::class, 'update'])->name('item-locations.update');
@@ -180,13 +176,22 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('can:transfer-requests.cancel')->group(function () {
-        Route::post('transfer-requests/{id}/cancel', [TransferRequestController::class, 'cancel'])->name('transfer-requests.cancel');
+        Route::post('transfer-request-items/{itemId}/cancel', [TransferRequestController::class, 'cancelItem'])
+            ->name('transfer-request-items.cancel');
     });
-    Route::middleware('can:transfer-requests.approve')->group(function () {
-        Route::post('transfer-requests/{id}/approve', [TransferRequestController::class, 'approve'])->name('transfer-requests.approve');
-    });
+
     Route::middleware('can:transfer-requests.reject')->group(function () {
-        Route::post('transfer-requests/{id}/reject', [TransferRequestController::class, 'reject'])->name('transfer-requests.reject');
+        Route::post('transfer-request-items/{itemId}/reject', [TransferRequestController::class, 'rejectItem'])
+            ->name('transfer-request-items.reject');
+    });
+
+    // Pembatalan setelah approve mengembalikan stok — wewenang IMC,
+    // jadi memakai permission approve.
+    Route::middleware('can:transfer-requests.approve')->group(function () {
+        Route::post('transfer-requests/{id}/approve', [TransferRequestController::class, 'approve'])
+            ->whereNumber('id')->name('transfer-requests.approve');
+        Route::post('transfer-request-items/{itemId}/cancel-approved', [TransferRequestController::class, 'cancelApprovedItem'])
+            ->name('transfer-request-items.cancel-approved');
     });
     Route::middleware('can:transfer-requests.receive')->group(function () {
         Route::post('transfer-requests/{id}/receive', [TransferRequestController::class, 'receive'])->name('transfer-requests.receive');

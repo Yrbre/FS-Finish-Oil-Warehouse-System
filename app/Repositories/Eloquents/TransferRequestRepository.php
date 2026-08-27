@@ -19,26 +19,27 @@ class TransferRequestRepository implements TransferRequestRepositoryInterface
     public function getAll()
     {
         return $this->model->with([
-            'item',
             'destinationWarehouse',
             'department',
             'requester',
-        ]);
+            'items.item',
+        ])->withCount('items');
     }
 
     public function getById(int $id)
     {
         return $this->model->with([
-            'item',
-            'destinationWarehouse',
             'department',
+            'destinationWarehouse',
             'requester',
             'approver',
             'receiver',
             'shipper',
             'receiptOfGoods.responsibility',
-            'details.itemLocation',
-            'details.sourceWarehouse',
+            'items.item',
+            'items.details.sourceWarehouse',
+            'items.rejecter',
+            'items.canceller',
         ])->findOrFail($id);
     }
 

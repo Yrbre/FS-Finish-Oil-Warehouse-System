@@ -13,7 +13,12 @@ return new class extends Migration
     {
         Schema::create('transfer_request_details', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('transfer_request_id')->constrained('transfer_requests')->cascadeOnDelete();
+
+            // Merujuk ke ITEM, bukan ke request — supaya pembatalan
+            // per item bisa menghapus detail & ledger miliknya saja.
+            $table->foreignId('transfer_request_item_id')
+                ->constrained('transfer_request_items')->cascadeOnDelete();
+
             $table->foreignId('item_location_id')->constrained('item_locations');
             $table->foreignId('source_warehouse_id')->constrained('warehouses');
 
@@ -23,19 +28,15 @@ return new class extends Migration
             $table->date('production_date')->nullable();
             $table->string('package')->nullable();
 
-            // qty_taken = package_taken x qty_perpackage
             $table->decimal('qty_perpackage', 15, 4);
             $table->decimal('package_taken', 15, 2);
             $table->decimal('qty_taken', 15, 2);
 
-            // Sisa lot asal SETELAH barang ini diambil, dibekukan saat
-            // approve. Tanpa snapshot, cetak ulang TTB akan menampilkan
-            // sisa terkini — bukan kondisi saat barang dikirim.
+            // Sisa lot asal saat approve — dibekukan supaya cetak
+            // ulang TTB tidak menampilkan angka yang sudah berubah.
             $table->decimal('remaining_weight', 15, 2)->default(0);
             $table->decimal('remaining_package', 15, 2)->default(0);
 
-            // FK ini sebelumnya tidak ada, jadi bisa menunjuk lot yang
-            // sudah terhapus tanpa ketahuan.
             $table->foreignId('dest_item_location_id')->nullable()
                 ->constrained('item_locations')->nullOnDelete();
 

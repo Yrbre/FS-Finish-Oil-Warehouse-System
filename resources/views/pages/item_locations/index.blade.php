@@ -8,13 +8,6 @@
                 <div class="col">
                     <h2 class="h5 page-title">Stok Gudang (Item Onhand)</h2>
                 </div>
-                <div class="col-auto">
-                    @can('item-locations.create')
-                        <a href="{{ route('item-locations.create') }}" class="btn btn-primary btn-sm">
-                            <span class="fe fe-plus fe-16 mr-2"></span>Tambah Stok
-                        </a>
-                    @endcan
-                </div>
             </div>
 
             <div class="row my-4">
@@ -28,21 +21,36 @@
                                     <select id="filterItem" class="form-control select2">
                                         <option value="">Semua Item</option>
                                         @foreach ($items as $item)
-                                            <option value="{{ $item->id }}">{{ $item->item_no }} -
-                                                {{ $item->item_desc }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="small text-muted">Filter Gudang</label>
-                                    <select id="filterWarehouse" class="form-control select2">
-                                        <option value="">Semua Gudang</option>
-                                        @foreach ($warehouses as $wh)
-                                            <option value="{{ $wh->id }}">{{ $wh->name }} - {{ $wh->tag }}
+                                            <option value="{{ $item->id }}">
+                                                {{ $item->item_no }} - {{ $item->item_desc }}
                                             </option>
                                         @endforeach
                                     </select>
                                 </div>
+
+                                @if ($isImc)
+                                    <div class="col-md-4">
+                                        <label class="small text-muted">Filter Gudang</label>
+                                        <select id="filterWarehouse" class="form-control select2">
+                                            <option value="">Semua Gudang</option>
+                                            @foreach ($warehouses as $wh)
+                                                <option value="{{ $wh->id }}">{{ $wh->name }} -
+                                                    {{ $wh->tag }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="small text-muted">Filter Pemilik</label>
+                                        <select id="filterDemander" class="form-control select2">
+                                            <option value="">Semua Department</option>
+                                            @foreach ($departments as $dept)
+                                                <option value="{{ $dept->id }}">{{ $dept->code }} -
+                                                    {{ $dept->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                @endif
                             </div>
 
                             <table class="table" id="dataTableItemLocation" style="width:100%">
@@ -51,10 +59,12 @@
                                         <th>No</th>
                                         <th>Item</th>
                                         <th>Gudang</th>
+                                        <th>Pemilik</th>
+                                        <th>Receiving Lot</th>
                                         <th>Vendor Lot</th>
-                                        <th>Exp Date by Production</th>
-                                        <th>Exp Date by Receiving</th>
-                                        <th>Stok Gudang</th>
+                                        <th>Exp Date</th>
+                                        <th>Package</th>
+                                        <th>Berat</th>
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>
@@ -81,6 +91,7 @@
                     data: function(d) {
                         d.item_id = $('#filterItem').val();
                         d.warehouse_id = $('#filterWarehouse').val();
+                        d.demander_id = $('#filterDemander').val();
                     },
                 },
                 columns: [{
@@ -100,6 +111,15 @@
                         orderable: false
                     },
                     {
+                        data: 'demander',
+                        name: 'demander',
+                        orderable: false
+                    },
+                    {
+                        data: 'receiving_lot',
+                        name: 'receiving_lot'
+                    },
+                    {
                         data: 'vendor_lot',
                         name: 'vendor_lot'
                     },
@@ -108,8 +128,10 @@
                         name: 'exp_date'
                     },
                     {
-                        data: 'exp_by_receiving_at',
-                        name: 'exp_by_receiving_at'
+                        data: 'package',
+                        name: 'package',
+                        orderable: false,
+                        searchable: false
                     },
                     {
                         data: 'qty_weight',
@@ -124,7 +146,7 @@
                 ],
             });
 
-            $('#filterItem, #filterWarehouse').on('change', function() {
+            $('#filterItem, #filterWarehouse, #filterDemander').on('change', function() {
                 table.ajax.reload();
             });
         });

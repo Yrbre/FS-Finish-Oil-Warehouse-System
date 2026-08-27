@@ -67,4 +67,21 @@ interface ItemLocationRepositoryInterface
     public function getNearExpiring(int $days = 30, int $limit = 10);
 
     public function getStockSummaryByWarehouse();
+
+    /**
+     * Package yang sudah "dipesan" oleh request lain yang masih new.
+     *
+     * Request berstatus new belum memotong stok, tapi sudah menjadi
+     * komitmen. Tanpa ini, dua request bisa sama-sama lolos validasi
+     * lalu salah satunya gagal saat approve.
+     *
+     * Sengaja tidak mengunci lot tertentu — lot mana yang diambil
+     * baru ditentukan FEFO saat approve.
+     */
+    public function getReservedPackage(
+        int $itemId,
+        int $demanderId,
+        float $perPackage,
+        ?int $excludeRequestId = null
+    ): float;
 }

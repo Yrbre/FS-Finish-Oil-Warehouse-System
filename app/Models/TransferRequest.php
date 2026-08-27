@@ -30,10 +30,6 @@ class TransferRequest extends Model
 
     protected $fillable = [
         'transfer_code',
-        'item_id',
-        'requested_perpackage',
-        'requested_package',
-        'requested_qty',
         'destination_warehouse_id',
         'department_id',
         'expected_date',
@@ -43,40 +39,69 @@ class TransferRequest extends Model
         'approved_by',
         'approved_at',
         'approved_date',
-        'surat_jalan_number',
-        'surat_jalan_date',
         'shipped_at',
         'shipped_by',
         'print_count',
         'received_by',
         'received_at',
         'received_date',
-        'rejected_by',
-        'rejected_at',
-        'reject_reason',
-        'cancelled_by',
-        'cancelled_at',
     ];
 
     protected $casts = [
-        'requested_perpackage' => 'decimal:4',
-        'requested_package'    => 'decimal:2',
-        'requested_qty'        => 'decimal:2',
-        'expected_date'        => 'date',
-        'approved_date'        => 'date',
-        'surat_jalan_date'     => 'date',
-        'received_date'        => 'date',
-        'approved_at'          => 'datetime',
-        'shipped_at'           => 'datetime',
-        'received_at'          => 'datetime',
-        'rejected_at'          => 'datetime',
-        'cancelled_at'         => 'datetime',
-        'print_count'          => 'integer',
+        'expected_date' => 'date',
+        'approved_date' => 'date',
+        'received_date' => 'date',
+        'approved_at'   => 'datetime',
+        'shipped_at'    => 'datetime',
+        'received_at'   => 'datetime',
+        'print_count'   => 'integer',
     ];
 
-    public function item()
+    public function items()
     {
-        return $this->belongsTo(Item::class);
+        return $this->hasMany(TransferRequestItem::class);
+    }
+
+    /** Item yang masih hidup — tidak ditolak/dibatalkan. */
+    public function activeItems()
+    {
+        return $this->items()->whereNotIn('status', [
+            TransferRequestItem::STATUS_REJECTED,
+            TransferRequestItem::STATUS_CANCELLED,
+        ]);
+    }
+
+    /**
+     * Turunkan status header dari status item-itemnya.
+     * Dipanggil setiap kali status item berubah.
+     */
+    public function syncStatusFromItems(): void
+    {
+        // Setelah TTB terbit, status header tidak lagi mengikuti item.
+        if (in_array($this->status, [self::STATUS_IN_TRANSIT, self::STATUS_RECEIVED], true)) {
+            return;
+        }
+
+        $items = $this->items()->get();
+
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $status = match (true) {
+            $items->contains('status', TransferRequestItem::STATUS_APPROVED)
+            => self::STATUS_APPROVED,
+            $items->every(fn($i) => $i->status === TransferRequestItem::STATUS_REJECTED)
+            => self::STATUS_REJECTED,
+            $items->every(fn($i) => $i->isVoid())
+            => self::STATUS_CANCELLED,
+            default
+            => self::STATUS_NEW,
+        };
+
+        if ($this->status !== $status) {
+            $this->update(['status' => $status]);
+        }
     }
 
     public function destinationWarehouse()
@@ -89,10 +114,6 @@ class TransferRequest extends Model
         return $this->belongsTo(Department::class);
     }
 
-    public function details()
-    {
-        return $this->hasMany(TransferRequestDetail::class);
-    }
 
     public function requester()
     {
@@ -109,29 +130,12 @@ class TransferRequest extends Model
         return $this->belongsTo(User::class, 'received_by');
     }
 
-    public function rejecter()
-    {
-        return $this->belongsTo(User::class, 'rejected_by');
-    }
-
-    public function canceller()
-    {
-        return $this->belongsTo(User::class, 'cancelled_by');
-    }
 
     public function receiptOfGoods()
     {
         return $this->hasOne(ReceiptOfGoods::class);
     }
 
-    /**
-     * Request hanya bisa dibatalkan requester selama belum ada
-     * approval maupun penolakan.
-     */
-    public function isCancellable(): bool
-    {
-        return $this->status === self::STATUS_NEW;
-    }
 
     /**
      * Surat jalan hanya bisa dicetak setelah approve. Cetak pertama → in_transit.

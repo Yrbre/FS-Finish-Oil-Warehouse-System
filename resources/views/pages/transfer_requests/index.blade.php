@@ -36,6 +36,7 @@
                                     <select id="filterStatus" class="form-control">
                                         <option value="">Semua Status</option>
                                         <option value="new">New</option>
+                                        <option value="approved">Approved</option>
                                         <option value="in_transit">In Transit</option>
                                         <option value="received">Received</option>
                                         <option value="rejected">Rejected</option>
@@ -52,7 +53,6 @@
                                         <th>Kode</th>
                                         <th>Item</th>
                                         <th>Tujuan</th>
-                                        <th>Qty</th>
                                         <th>Tgl Dibutuhkan</th>
                                         <th>Requester</th>
                                         <th>Status</th>
@@ -143,18 +143,16 @@
                         name: 'transfer_code'
                     },
                     {
-                        data: 'item',
-                        name: 'item',
-                        orderable: false
+                        // Nama item pertama + jumlah item lainnya
+                        data: 'item_summary',
+                        name: 'item_summary',
+                        orderable: false,
+                        searchable: false
                     },
                     {
                         data: 'destination',
                         name: 'destination',
                         orderable: false
-                    },
-                    {
-                        data: 'requested_qty',
-                        name: 'requested_qty'
                     },
                     {
                         data: 'expected_date',

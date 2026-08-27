@@ -10,7 +10,7 @@ class TransferRequestDetail extends Model
     use HasFactory;
 
     protected $fillable = [
-        'transfer_request_id',
+        'transfer_request_item_id',
         'item_location_id',
         'source_warehouse_id',
         'vendor_lot',
@@ -36,9 +36,9 @@ class TransferRequestDetail extends Model
         'remaining_package' => 'decimal:2',
     ];
 
-    public function transferRequest()
+    public function transferRequestItem()
     {
-        return $this->belongsTo(TransferRequest::class);
+        return $this->belongsTo(TransferRequestItem::class);
     }
 
     /**

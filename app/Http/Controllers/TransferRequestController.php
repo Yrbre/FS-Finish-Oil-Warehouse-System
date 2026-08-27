@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ReceiptBatchRequest;
 use App\Http\Requests\ReceiptOfGoodsRequest;
-use App\Http\Requests\RejectTransferRequestRequest;
+use App\Http\Requests\RejectTransferItemRequest;
 use App\Http\Requests\TransferRequestStoreRequest;
 use App\Models\TransferRequest;
 use App\Services\Interfaces\ItemServiceInterface;
@@ -49,17 +49,21 @@ class TransferRequestController extends Controller
 
                 return DataTables::of($transferRequests)
                     ->addIndexColumn()
-                    ->addColumn('checkbox',  fn($row) => '<input type="checkbox" class="row-checkbox" value="' . $row->id . '">')
-                    ->addColumn('item', fn($row) => $row->item->item_desc)
-                    ->addColumn('destination', fn($row) => $row->destinationWarehouse->name)
-                    ->addColumn('requested_qty', fn($row) => number_format((float) $row->requested_qty, 2, ',', '.'))
+                    ->addColumn('checkbox', fn($row) => '<input type="checkbox" class="row-checkbox" value="' . $row->id . '">')
+                    ->addColumn('item_summary', function ($row) {
+                        $count = $row->items_count;
+                        $first = $row->items->first()?->item->item_desc ?? '-';
+
+                        return $count > 1
+                            ? e($first) . ' <span class="badge badge-light">+' . ($count - 1) . ' item</span>'
+                            : e($first);
+                    })
+                    ->addColumn('destination', fn($row) => $row->destinationWarehouse->name . ' - ' . $row->destinationWarehouse->tag)
                     ->addColumn('expected_date', fn($row) => Carbon::parse($row->expected_date)->format('d-m-Y'))
                     ->addColumn('requester', fn($row) => $row->requester->name)
                     ->addColumn('status', fn($row) => $this->statusBadge($row->status))
-                    ->addColumn('action', function ($row) {
-                        return '<a href="' . route('transfer-requests.show', $row->id) . '" class="btn btn-sm btn-info">Detail</a>';
-                    })
-                    ->rawColumns(['status', 'action', 'checkbox'])
+                    ->addColumn('action', fn($row) => '<a href="' . route('transfer-requests.show', $row->id) . '" class="btn btn-sm btn-info">Detail</a>')
+                    ->rawColumns(['status', 'action', 'checkbox', 'item_summary'])
                     ->make(true);
             }
 
@@ -120,6 +124,7 @@ class TransferRequestController extends Controller
                 ->with('success', 'Permintaan Kirim Barang berhasil dibuat: ' . $transferRequest->transfer_code);
         } catch (\Exception $e) {
             Log::error('Gagal membuat Permintaan Kirim Barang: ' . $e->getMessage());
+
             return redirect()->back()->with('error', $e->getMessage())->withInput();
         }
     }
@@ -146,15 +151,18 @@ class TransferRequestController extends Controller
     public function approve(Request $request, string $id)
     {
         try {
-            // allocation[] dari form: item_location_id => jumlah PACKAGE.
-            // Kalau approver tidak mengubah apa pun, nilainya = saran FEFO
-            // yang sudah di-pre-fill di view.
-            $manualAllocation = $request->filled('allocation')
-                ? collect($request->input('allocation'))
-                ->map(fn($pkg) => (float) $pkg)
-                ->filter(fn($pkg) => $pkg > 0)
-                ->toArray()
-                : null;
+            // allocation[transfer_request_item_id][item_location_id] = package
+            $manualAllocation = null;
+
+            if ($request->filled('allocation')) {
+                $manualAllocation = collect($request->input('allocation'))
+                    ->map(fn($lots) => collect($lots)
+                        ->map(fn($pkg) => (float) $pkg)
+                        ->filter(fn($pkg) => $pkg > 0)
+                        ->toArray())
+                    ->filter(fn($lots) => ! empty($lots))
+                    ->toArray();
+            }
 
             $transferRequest = $this->transferRequestService->approve(
                 (int) $id,
@@ -164,9 +172,10 @@ class TransferRequestController extends Controller
             );
 
             return redirect()->route('transfer-requests.show', $id)
-                ->with('success', 'Permintaan Kirim Barang disetujui, stok telah dikirim (' . $transferRequest->transfer_code . ').');
+                ->with('success', 'Permintaan disetujui (' . $transferRequest->transfer_code . ').');
         } catch (\Exception $e) {
             Log::error('Gagal approve Permintaan Kirim Barang: ' . $e->getMessage());
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
@@ -188,30 +197,53 @@ class TransferRequestController extends Controller
         }
     }
 
-    public function reject(RejectTransferRequestRequest $request, string $id)
+    public function rejectItem(RejectTransferItemRequest $request, string $itemId)
     {
         try {
-            $this->transferRequestService->reject(
-                (int) $id,
+            $trItem = $this->transferRequestService->rejectItem(
+                (int) $itemId,
                 auth()->id(),
-                $request->validated()['reject_reason']
+                $request->validated()['reason']
             );
 
-            return redirect()->route('transfer-requests.index')->with('success', 'Permintaan Kirim Barang ditolak.');
+            return redirect()->route('transfer-requests.show', $trItem->transfer_request_id)
+                ->with('success', 'Item berhasil ditolak.');
         } catch (\Exception $e) {
-            Log::error('Gagal reject Permintaan Kirim Barang: ' . $e->getMessage());
+            Log::error('Gagal menolak item: ' . $e->getMessage());
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
 
-    public function cancel(string $id)
+    public function cancelItem(string $itemId)
     {
         try {
-            $this->transferRequestService->cancel((int) $id, auth()->id());
+            $trItem = $this->transferRequestService->cancelItem((int) $itemId, auth()->id());
 
-            return redirect()->route('transfer-requests.index')->with('success', 'Permintaan Kirim Barang dibatalkan.');
+            return redirect()->route('transfer-requests.show', $trItem->transfer_request_id)
+                ->with('success', 'Item berhasil dibatalkan.');
         } catch (\Exception $e) {
-            Log::error('Gagal cancel Permintaan Kirim Barang: ' . $e->getMessage());
+            Log::error('Gagal membatalkan item: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    /** Batalkan item yang sudah approved — stok dikembalikan ke lot asal. */
+    public function cancelApprovedItem(RejectTransferItemRequest $request, string $itemId)
+    {
+        try {
+            $trItem = $this->transferRequestService->cancelApprovedItem(
+                (int) $itemId,
+                auth()->id(),
+                $request->validated()['reason']
+            );
+
+            return redirect()->route('transfer-requests.show', $trItem->transfer_request_id)
+                ->with('success', 'Item dibatalkan, stok telah dikembalikan ke gudang asal.');
+        } catch (\Exception $e) {
+            Log::error('Gagal membatalkan item approved: ' . $e->getMessage());
+
             return redirect()->back()->with('error', $e->getMessage());
         }
     }

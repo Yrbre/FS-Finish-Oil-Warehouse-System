@@ -190,9 +190,32 @@
                         @foreach ($half as $transferRequest)
                             @php
                                 $rog = $transferRequest->receiptOfGoods;
-                                $details = $transferRequest->details;
-                                $itemName = $transferRequest->item->item_desc ?? '-';
                                 $totalRows = 12;
+
+                                // Ratakan: tiap item bisa punya beberapa lot,
+                                // dan tiap lot jadi satu baris di dokumen.
+                                // Item yang ditolak/dibatalkan tidak ikut dicetak.
+                                $rows = collect();
+
+                                foreach ($transferRequest->items as $trItem) {
+                                    if ($trItem->isVoid()) {
+                                        continue;
+                                    }
+
+                                    foreach ($trItem->details as $detail) {
+                                        $rows->push(
+                                            (object) [
+                                                'item_desc' => $trItem->item->item_desc ?? '-',
+                                                'lot' => $detail->vendor_lot ?? ($detail->receiving_lot ?? '-'),
+                                                'package_taken' => (int) $detail->package_taken,
+                                                'package' => $detail->package ?? '-',
+                                                'remaining' => (float) $detail->remaining_weight,
+                                                'perpackage' => (float) $detail->qty_perpackage,
+                                                'qty_taken' => (float) $detail->qty_taken,
+                                            ],
+                                        );
+                                    }
+                                }
                             @endphp
                             <td class="grid-cell">
                                 <div class="ttb-box">
@@ -228,34 +251,35 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-
-                                            @foreach ($details as $i => $detail)
+                                            @foreach ($rows as $i => $row)
                                                 @if ($i < $totalRows)
                                                     <tr>
                                                         <td>{{ $i + 1 }}</td>
                                                         <td class="text-left">
-                                                            {{ \Illuminate\Support\Str::limit($itemName, 22) }}
+                                                            {{ \Illuminate\Support\Str::limit($row->item_desc, 22) }}
                                                         </td>
-                                                        <td>{{ $detail->vendor_lot ?? ($detail->receiving_lot ?? '-') }}
-                                                        </td>
-                                                        <td>{{ (int) $detail->package_taken }}
-                                                            {{ $detail->package ?? '-' }}
-                                                        </td>
-                                                        {{-- Sisa lot asal di gudang IMC setelah barang diambil --}}
-                                                        <td>
-                                                            {{ number_format((float) $detail->remaining_weight, 1, ',', '.') }}
-                                                            kg
-                                                        </td>
+                                                        <td>{{ $row->lot }}</td>
+                                                        <td>{{ $row->package_taken }} {{ $row->package }}</td>
+                                                        {{-- Sisa lot asal saat barang dikirim (snapshot) --}}
+                                                        <td>{{ number_format($row->remaining, 1, ',', '.') }} kg</td>
                                                         <td class="text-left">
-                                                            @
-                                                            {{ number_format((float) $detail->qty_perpackage, 2, ',', '.') }}
-                                                            kg
+                                                            @ {{ number_format($row->perpackage, 2, ',', '.') }} kg
                                                         </td>
                                                     </tr>
                                                 @endif
                                             @endforeach
 
-                                            @for ($i = min($details->count(), $totalRows); $i < $totalRows; $i++)
+                                            {{-- Peringatan kalau ada baris yang tidak muat --}}
+                                            @if ($rows->count() > $totalRows)
+                                                <tr>
+                                                    <td colspan="6" class="text-left"
+                                                        style="font-weight: bold; font-size: 6px;">
+                                                        ... dan {{ $rows->count() - $totalRows }} baris lainnya
+                                                    </td>
+                                                </tr>
+                                            @endif
+
+                                            @for ($i = min($rows->count(), $totalRows); $i < $totalRows; $i++)
                                                 <tr>
                                                     <td>&nbsp;</td>
                                                     <td>&nbsp;</td>
@@ -269,11 +293,10 @@
                                             <tr>
                                                 <td colspan="3" style="text-align: right; font-weight: bold;">TOTAL
                                                 </td>
-                                                <td style="font-weight: bold;">
-                                                    {{ (int) $details->sum('package_taken') }}</td>
+                                                <td style="font-weight: bold;">{{ $rows->sum('package_taken') }}</td>
                                                 <td></td>
                                                 <td class="text-left" style="font-weight: bold;">
-                                                    {{ number_format($details->sum('qty_taken'), 2, ',', '.') }} kg
+                                                    {{ number_format($rows->sum('qty_taken'), 2, ',', '.') }} kg
                                                 </td>
                                             </tr>
                                         </tbody>

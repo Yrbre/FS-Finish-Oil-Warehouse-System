@@ -241,4 +241,9 @@ class ItemLocationService implements ItemLocationServiceInterface
             $perPackage
         );
     }
+
+    public function getReservedPackage(int $itemId, int $demanderId, float $perPackage, ?int $excludeRequestId = null): float
+    {
+        return $this->itemLocationRepository->getReservedPackage($itemId, $demanderId, $perPackage, $excludeRequestId);
+    }
 }
