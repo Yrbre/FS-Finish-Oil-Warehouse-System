@@ -81,7 +81,6 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:items.view')->group(function () {
         Route::get('items', [ItemController::class, 'index'])->name('items.index');
         Route::get('items/{id}/detail', [ItemController::class, 'detail'])->name('items.detail');
-        Route::get('items/get-stock', [ItemController::class, 'getStock'])->name('items.get-stock');
     });
     Route::middleware('can:items.create')->group(function () {
         Route::get('items/create', [ItemController::class, 'create'])->name('items.create');
@@ -124,8 +123,16 @@ Route::middleware('auth')->group(function () {
     // (canAny salah satu dari 3 permission view) dan filter jenis
     // yang boleh dilihat.
     Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
-    Route::get('transactions/get-stock', [TransactionController::class, 'getStock'])->name('transactions.get-stock');
-    Route::get('transactions/get-lots', [TransactionController::class, 'getLots'])->name('transactions.get-lots');
+
+    // AJAX stok & lot dijaga permission, bukan sekadar auth — tanpa ini
+    // siapa pun yang login bisa mengintip stok gudang department lain
+    // dengan menebak warehouse_id lewat URL.
+    Route::middleware('can:transactions.cons.create')->group(function () {
+        Route::get('transactions/get-stock', [TransactionController::class, 'getStock'])->name('transactions.get-stock');
+    });
+    Route::middleware('can:transactions.adj.create')->group(function () {
+        Route::get('transactions/get-lots', [TransactionController::class, 'getLots'])->name('transactions.get-lots');
+    });
 
     Route::middleware('can:transactions.porc.create')->group(function () {
         Route::get('transactions/supply-oil', [TransactionController::class, 'createPorc'])->name('transactions.porc.create');

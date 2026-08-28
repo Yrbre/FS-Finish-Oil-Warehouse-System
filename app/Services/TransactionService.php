@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ItemLocation;
 use App\Models\StockLedger;
 use App\Models\Transaction;
+use App\Repositories\Interfaces\ItemLocationRepositoryInterface;
 use App\Repositories\Interfaces\ItemRepositoryInterface;
 use App\Repositories\Interfaces\StockLedgerRepositoryInterface;
 use App\Repositories\Interfaces\TransactionRepositoryInterface;
@@ -24,6 +25,7 @@ class TransactionService implements TransactionServiceInterface
         protected ItemLocationServiceInterface $itemLocationService,
         protected StockLedgerServiceInterface $stockLedgerService,
         protected StockLedgerRepositoryInterface $stockLedgerRepository,
+        protected ItemLocationRepositoryInterface $itemLocationRepository,
     ) {}
 
     public function getAll()
@@ -387,7 +389,8 @@ class TransactionService implements TransactionServiceInterface
                     (int) $transaction->item_id,
                     (int) $transaction->warehouse_id,
                     (int) $transaction->demander_id,
-                    (float) $transaction->out_qty
+                    (float) $transaction->out_qty,
+                    true   // kunci — stok akan benar-benar dipotong
                 );
 
                 if (! $result->isFulfilled()) {
@@ -407,7 +410,8 @@ class TransactionService implements TransactionServiceInterface
                     throw new \Exception("Adjustment harus memilih lot yang akan dikoreksi.");
                 }
 
-                $lot = $this->itemLocationService->getById((int) $data['item_location_id']);
+                // ADJ juga mengubah qty_weight, jadi lotnya dikunci.
+                $lot = $this->itemLocationRepository->getByIdForUpdate((int) $data['item_location_id']);
 
                 if ((int) $lot->demander_id !== (int) $transaction->demander_id) {
                     throw new \Exception("Lot yang dipilih bukan milik department ini.");

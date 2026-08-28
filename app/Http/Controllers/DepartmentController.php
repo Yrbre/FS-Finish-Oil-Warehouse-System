@@ -21,11 +21,11 @@ class DepartmentController extends Controller
     {
         try {
             if ($request->ajax()) {
-                $departments = $this->departmentService->getAll();
+                $departments = $this->departmentService->getAll()->withCount('warehouses');
 
                 return DataTables::of($departments)
                     ->addIndexColumn()
-                    ->addColumn('warehouse_count', fn($row) => $row->warehouses()->count())
+                    ->addColumn('warehouse_count', fn($row) => $row->warehouses_count)
                     ->addColumn('action', function ($row) {
                         $btns = '';
 

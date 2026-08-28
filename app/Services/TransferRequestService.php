@@ -9,6 +9,7 @@ use App\Models\TransferRequest;
 use App\Models\TransferRequestItem;
 use App\Models\User;
 use App\Notifications\TransferRequestNotification;
+use App\Repositories\Interfaces\ItemLocationRepositoryInterface;
 use App\Repositories\Interfaces\StockLedgerRepositoryInterface;
 use App\Repositories\Interfaces\TransferRequestRepositoryInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
@@ -28,6 +29,7 @@ class TransferRequestService implements TransferRequestServiceInterface
         protected StockLedgerServiceInterface $stockLedgerService,
         protected StockLedgerRepositoryInterface $stockLedgerRepository,
         protected WarehouseServiceInterface $warehouseService,
+        protected ItemLocationRepositoryInterface $itemLocationRepository,
     ) {}
 
     public function getAll()
@@ -427,7 +429,9 @@ class TransferRequestService implements TransferRequestServiceInterface
 
             // Kembalikan stok ke lot asal.
             foreach ($trItem->details as $detail) {
-                $lot = $this->itemLocationService->getById((int) $detail->item_location_id);
+                // Dikunci karena lot ini akan ditambah — tanpa kunci,
+                // perubahan bersamaan dari CONS bisa saling menimpa.
+                $lot = $this->itemLocationRepository->getByIdForUpdate((int) $detail->item_location_id);
 
                 if ($lot->disposed_at !== null) {
                     throw new \Exception(
@@ -671,15 +675,6 @@ class TransferRequestService implements TransferRequestServiceInterface
             $destWarehouseId = (int) $request->destination_warehouse_id;
             $demanderId      = (int) $request->department_id;
 
-            $bbQty = $this->itemLocationService->getTotalStock(
-                (int) $request->item_id,
-                $destWarehouseId,
-                $demanderId
-            );
-
-            $details  = collect();
-            $totalQty = 0.0;
-
             foreach ($request->activeItems()->with('details')->get() as $trItem) {
                 $bbQty = $this->itemLocationService->getTotalStock(
                     (int) $trItem->item_id,
@@ -766,7 +761,8 @@ class TransferRequestService implements TransferRequestServiceInterface
             (int) $request->department_id,
             $this->sourceWarehouseIds($request->destination_warehouse_id),
             (float) $trItem->requested_perpackage,
-            (float) $trItem->requested_package
+            (float) $trItem->requested_package,
+            true   // kunci — dipanggil dari approve()
         );
 
         if (! $result->isFulfilled()) {

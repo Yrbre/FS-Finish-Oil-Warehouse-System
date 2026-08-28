@@ -30,13 +30,17 @@ interface ItemLocationServiceInterface
 
     /* ---------------- Alokasi ---------------- */
 
-    /** TRANSFER: package utuh, ukuran cocok persis. */
+    /**
+     * TRANSFER: package utuh, ukuran cocok persis.
+     * $forUpdate = true saat stok akan benar-benar dipotong.
+     */
     public function allocateForTransfer(
         int $itemId,
         int $demanderId,
         array $warehouseIds,
         float $perPackage,
-        float $packageNeeded
+        float $packageNeeded,
+        bool $forUpdate = false
     ): AllocationResult;
 
     /** CONS: potong kg, lintas ukuran kemasan. */
@@ -44,7 +48,8 @@ interface ItemLocationServiceInterface
         int $itemId,
         int $warehouseId,
         int $demanderId,
-        float $weightNeeded
+        float $weightNeeded,
+        bool $forUpdate = false
     ): AllocationResult;
 
     public function getAvailablePackageSizes(int $itemId, int $demanderId, array $warehouseIds): Collection;
@@ -67,4 +72,7 @@ interface ItemLocationServiceInterface
 
     /** Semua lot yang bisa dipakai transfer, untuk form alokasi manual. */
     public function getTransferLots(int $itemId, int $demanderId, array $warehouseIds, float $perPackage): Collection;
+
+    /** Package yang sudah dipesan request lain yang masih new. */
+    public function getReservedPackage(int $itemId, int $demanderId, float $perPackage, ?int $excludeRequestId = null): float;
 }

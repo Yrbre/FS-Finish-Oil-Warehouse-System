@@ -27,7 +27,7 @@ class UserController extends Controller
     {
         try {
             if ($request->ajax()) {
-                $users = $this->userService->getAll();
+                $users = $this->userService->getAll()->with('transferApprover');
 
                 return DataTables::of($users)
                     ->addIndexColumn()

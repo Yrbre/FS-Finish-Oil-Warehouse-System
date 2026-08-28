@@ -15,20 +15,17 @@ use Yajra\DataTables\Facades\DataTables;
 class ItemController extends Controller
 {
     protected ItemServiceInterface $itemService;
-    protected ItemLocationServiceInterface $itemLocationService;
     protected StockLedgerServiceInterface $stockLedgerService;
     protected WarehouseServiceInterface $warehouseService;
     protected DepartmentServiceInterface $departmentService;
 
     public function __construct(
         ItemServiceInterface $itemService,
-        ItemLocationServiceInterface $itemLocationService,
         StockLedgerServiceInterface $stockLedgerService,
         WarehouseServiceInterface $warehouseService,
         DepartmentServiceInterface $departmentService
     ) {
         $this->itemService         = $itemService;
-        $this->itemLocationService = $itemLocationService;
         $this->stockLedgerService  = $stockLedgerService;
         $this->warehouseService    = $warehouseService;
         $this->departmentService   = $departmentService;
@@ -41,15 +38,18 @@ class ItemController extends Controller
             // Edit/Hapus di kolom action tetap perlu dicek permission
             // spesifiknya masing-masing.
             if ($request->ajax()) {
-                $items = $this->itemService->getAll();
+                $items = $this->itemService->getAll()
+                    ->withSum(
+                        ['itemLocations as total_stock' => fn($q) => $q
+                            ->whereNull('disposed_at')
+                            ->where('qty_weight', '>', 0)],
+                        'qty_weight'
+                    );
 
                 return DataTables::of($items)
                     ->addIndexColumn()
-                    ->addColumn('total_stock', function ($row) {
-                        $stock = $this->itemLocationService->getTotalStockAllWarehouses($row->id);
-
-                        return number_format($stock, 2, ',', '.') . ' ' . $row->item_uom;
-                    })
+                    ->addColumn('total_stock', fn($row) =>
+                    number_format((float) ($row->total_stock ?? 0), 2, ',', '.') . ' ' . $row->item_uom)
                     ->addColumn('action', function ($row) {
                         $btns = '<a href="' . route('items.detail', $row->id) . '" class="btn btn-sm btn-info">Kartu Stok</a>';
 
@@ -66,7 +66,10 @@ class ItemController extends Controller
 
                         return $btns;
                     })
-                    ->rawColumns(['action'])
+                    ->addColumn('min_stock', fn($row) => $row->min_stock
+                        ? number_format((float) $row->min_stock, 2, ',', '.') . ' ' . $row->item_uom
+                        : '<span class="text-muted">-</span>')
+                    ->rawColumns(['action', 'min_stock'])
                     ->make(true);
             }
 

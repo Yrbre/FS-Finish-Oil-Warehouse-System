@@ -39,7 +39,7 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
      */
     public function getByIdForUpdate(int $id)
     {
-        return $this->model->lockForUpdate()->findOrFail($id);
+        return $this->model->withTrashed()->lockForUpdate()->findOrFail($id);
     }
 
     public function create(array $data)
@@ -250,5 +250,45 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
                     ->when($excludeRequestId, fn($q2) => $q2->where('id', '!=', $excludeRequestId));
             })
             ->sum('requested_package');
+    }
+
+    /**
+     * Sama dengan getFefoLotsForCons(), tapi mengunci baris lot.
+     *
+     * Tanpa kunci, dua CONS bersamaan sama-sama membaca stok lama,
+     * keduanya lolos validasi, dan stok jadi minus.
+     */
+    public function getFefoLotsForConsForUpdate(int $itemId, int $warehouseId, int $demanderId): Collection
+    {
+        return $this->model
+            ->where('item_id', $itemId)
+            ->where('warehouse_id', $warehouseId)
+            ->ownedBy($demanderId)
+            ->available()
+            ->fefo()
+            ->lockForUpdate()
+            ->get();
+    }
+
+    public function getFefoLotsForTransferForUpdate(
+        int $itemId,
+        int $demanderId,
+        array $warehouseIds,
+        float $perPackage
+    ): Collection {
+        if (empty($warehouseIds)) {
+            return collect();
+        }
+
+        return $this->model
+            ->with('warehouse')
+            ->where('item_id', $itemId)
+            ->whereIn('warehouse_id', $warehouseIds)
+            ->ownedBy($demanderId)
+            ->ofPackageSize($perPackage)
+            ->available()
+            ->fefo()
+            ->lockForUpdate()
+            ->get();
     }
 }

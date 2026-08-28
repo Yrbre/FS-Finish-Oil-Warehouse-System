@@ -313,15 +313,23 @@ class TransactionController extends Controller
             'warehouse_id' => ['required', 'exists:warehouses,id'],
         ]);
 
+        $demanderId = auth()->user()->department_id;
+
+        if (! $demanderId) {
+            return response()->json([]);
+        }
+
         $lots = $this->itemLocationService->getAll()
             ->where('item_id', $request->item_id)
             ->where('warehouse_id', $request->warehouse_id)
+            // ADJ hanya boleh mengoreksi lot milik department sendiri.
+            ->where('demander_id', $demanderId)
             ->get()
             ->map(fn($lot) => [
                 'id'    => $lot->id,
-                'label' => ($lot->vendor_lot ?? 'Lot #' . $lot->id)
+                'label' => ($lot->receiving_lot ?? ($lot->vendor_lot ?? 'Lot #' . $lot->id))
                     . ' — Exp: ' . ($lot->exp_date?->format('d/m/Y') ?? '-')
-                    . ' — Stok: ' . number_format((float) $lot->qty_weight, 2, ',', '.'),
+                    . ' — Stok: ' . number_format((float) $lot->qty_weight, 2, ',', '.') . ' kg',
             ]);
 
         return response()->json($lots);

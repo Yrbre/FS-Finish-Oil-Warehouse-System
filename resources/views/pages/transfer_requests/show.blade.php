@@ -11,10 +11,11 @@
     ];
 
     $isNew = $transferRequest->status === 'new';
-    $canApprove = auth()->user()->can('transfer-requests.approve');
     $isRequester = $transferRequest->requested_by === auth()->id();
     $hasReceipt = (bool) $transferRequest->receiptOfGoods;
+    $canApprove = auth()->user()->can('transfer-requests.approve') && auth()->user()->isTransferApprover();
 
+    $canReject = auth()->user()->can('transfer-requests.reject') && auth()->user()->isTransferApprover();
     // Rekomendasi hanya dihitung saat masih new
     $recItems = collect($recommendation['items'] ?? [])->keyBy(fn($r) => $r['item']->id);
 @endphp
@@ -123,14 +124,14 @@
                         <div>
                             {{-- Aksi saat item masih new --}}
                             @if ($trItem->isPending())
-                                @can('transfer-requests.reject')
+                                @if ($canReject)
                                     <button type="button" class="btn btn-sm btn-outline-danger btn-reject-item"
                                         data-id="{{ $trItem->id }}" data-name="{{ e($trItem->item->item_desc) }}">
                                         Tolak
                                     </button>
-                                @endcan
+                                @endif
 
-                                @if ($isRequester)
+                                @if ($isRequester && auth()->user()->can('transfer-requests.cancel'))
                                     <button type="button" class="btn btn-sm btn-outline-secondary btn-cancel-item"
                                         data-id="{{ $trItem->id }}" data-name="{{ e($trItem->item->item_desc) }}">
                                         Batalkan

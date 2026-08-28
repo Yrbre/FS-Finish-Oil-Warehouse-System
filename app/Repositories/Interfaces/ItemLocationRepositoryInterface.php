@@ -84,4 +84,11 @@ interface ItemLocationRepositoryInterface
         float $perPackage,
         ?int $excludeRequestId = null
     ): float;
+
+    /** Versi berkunci — panggil hanya di dalam DB::transaction(). */
+    public function getByIdForUpdate(int $id);
+
+    public function getFefoLotsForConsForUpdate(int $itemId, int $warehouseId, int $demanderId): Collection;
+
+    public function getFefoLotsForTransferForUpdate(int $itemId, int $demanderId, array $warehouseIds, float $perPackage): Collection;
 }

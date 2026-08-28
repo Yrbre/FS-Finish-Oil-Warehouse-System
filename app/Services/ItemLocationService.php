@@ -72,23 +72,21 @@ class ItemLocationService implements ItemLocationServiceInterface
     /* ================= ALOKASI ================= */
 
     /**
-     * Tidak melempar exception saat stok kurang — hasilnya dikembalikan
-     * apa adanya lewat AllocationResult supaya pemanggil bisa
-     * menampilkan "kurang berapa" ke approver.
+     * $forUpdate mengunci baris lot. Dipakai saat stok akan dipotong
+     * (approve, CONS) — bukan saat hanya menampilkan rekomendasi,
+     * supaya lot tidak terkunci tanpa perlu.
      */
     public function allocateForTransfer(
         int $itemId,
         int $demanderId,
         array $warehouseIds,
         float $perPackage,
-        float $packageNeeded
+        float $packageNeeded,
+        bool $forUpdate = false
     ): AllocationResult {
-        $lots = $this->itemLocationRepository->getFefoLotsForTransfer(
-            $itemId,
-            $demanderId,
-            $warehouseIds,
-            $perPackage
-        );
+        $lots = $forUpdate
+            ? $this->itemLocationRepository->getFefoLotsForTransferForUpdate($itemId, $demanderId, $warehouseIds, $perPackage)
+            : $this->itemLocationRepository->getFefoLotsForTransfer($itemId, $demanderId, $warehouseIds, $perPackage);
 
         return $this->allocator->allocateByPackage($lots, $packageNeeded);
     }
@@ -97,13 +95,12 @@ class ItemLocationService implements ItemLocationServiceInterface
         int $itemId,
         int $warehouseId,
         int $demanderId,
-        float $weightNeeded
+        float $weightNeeded,
+        bool $forUpdate = false
     ): AllocationResult {
-        $lots = $this->itemLocationRepository->getFefoLotsForCons(
-            $itemId,
-            $warehouseId,
-            $demanderId
-        );
+        $lots = $forUpdate
+            ? $this->itemLocationRepository->getFefoLotsForConsForUpdate($itemId, $warehouseId, $demanderId)
+            : $this->itemLocationRepository->getFefoLotsForCons($itemId, $warehouseId, $demanderId);
 
         return $this->allocator->allocateByWeight($lots, $weightNeeded);
     }
@@ -125,7 +122,9 @@ class ItemLocationService implements ItemLocationServiceInterface
      */
     public function deductLot(int $itemLocationId, float $qtyWeight): ItemLocation
     {
-        $lot = $this->itemLocationRepository->getById($itemLocationId);
+        // Kunci baris supaya dua proses bersamaan tidak sama-sama
+        // membaca stok lama lalu keduanya lolos validasi.
+        $lot = $this->itemLocationRepository->getByIdForUpdate($itemLocationId);
 
         $newWeight = round((float) $lot->qty_weight - $qtyWeight, 2);
 
