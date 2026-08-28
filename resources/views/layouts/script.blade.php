@@ -87,3 +87,15 @@
         }
     });
 </script>
+
+<script>
+    const ICON = {
+        min_stock: 'fe-alert-triangle text-warning',
+        near_expiry: 'fe-clock text-danger',
+        transfer_created: 'fe-inbox text-primary',
+        transfer_approved: 'fe-check-circle text-success',
+        transfer_shipped: 'fe-truck text-info',
+        transfer_received: 'fe-package text-success',
+        transfer_rejected: 'fe-x-circle text-danger',
+    };
+</script>

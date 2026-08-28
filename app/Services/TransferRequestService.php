@@ -8,15 +8,17 @@ use App\Models\StockLedger;
 use App\Models\TransferRequest;
 use App\Models\TransferRequestItem;
 use App\Models\User;
+use App\Notifications\TransferRequestNotification;
+use App\Repositories\Interfaces\StockLedgerRepositoryInterface;
 use App\Repositories\Interfaces\TransferRequestRepositoryInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\StockLedgerServiceInterface;
 use App\Services\Interfaces\TransferRequestServiceInterface;
 use App\Services\Interfaces\WarehouseServiceInterface;
-use App\Repositories\Interfaces\StockLedgerRepositoryInterface;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class TransferRequestService implements TransferRequestServiceInterface
 {
@@ -78,6 +80,13 @@ class TransferRequestService implements TransferRequestServiceInterface
                     'status'               => TransferRequestItem::STATUS_NEW,
                 ]);
             }
+
+            $request->load(['items', 'department', 'destinationWarehouse']);
+
+            $this->notifyUsers(
+                $this->approverUsers(),
+                new TransferRequestNotification($request, TransferRequestNotification::CREATED)
+            );
 
             return $request;
         });
@@ -245,9 +254,17 @@ class TransferRequestService implements TransferRequestServiceInterface
                 'approved_date' => $transDate->toDateString(),
             ]);
 
+
             $request->refresh()->syncStatusFromItems();
 
-            return $this->transferRequestRepository->getById($id);
+            $fresh = $this->transferRequestRepository->getById($id);
+
+            $this->notifyUsers(
+                $this->requesterUser($fresh),
+                new TransferRequestNotification($fresh, TransferRequestNotification::APPROVED)
+            );
+
+            return $fresh;
         });
     }
 
@@ -331,7 +348,20 @@ class TransferRequestService implements TransferRequestServiceInterface
                 'reject_reason' => $reason,
             ]);
 
-            $trItem->transferRequest->syncStatusFromItems();
+
+            $request = $trItem->transferRequest;
+            $request->syncStatusFromItems();
+
+            $request->load(['department', 'destinationWarehouse', 'items']);
+
+            $this->notifyUsers(
+                $this->requesterUser($request),
+                new TransferRequestNotification(
+                    $request,
+                    TransferRequestNotification::REJECTED,
+                    $trItem->item->item_desc . ' — ' . $reason
+                )
+            );
 
             return $trItem;
         });
@@ -470,12 +500,21 @@ class TransferRequestService implements TransferRequestServiceInterface
                 'photo'               => $data['photo'] ?? null,
             ]);
 
-            return $this->transferRequestRepository->update($id, [
+            $updated = $this->transferRequestRepository->update($id, [
                 'status'      => TransferRequest::STATUS_IN_TRANSIT,
                 'shipped_by'  => $issuedBy,
                 'shipped_at'  => now(),
                 'print_count' => 1,
             ]);
+
+            // Semua user di department tujuan perlu tahu barang
+            // sudah berangkat supaya siap mengkonfirmasi.
+            $this->notifyUsers(
+                $this->departmentUsers((int) $request->department_id),
+                new TransferRequestNotification($request, TransferRequestNotification::SHIPPED)
+            );
+
+            return $updated;
         });
     }
 
@@ -548,6 +587,11 @@ class TransferRequestService implements TransferRequestServiceInterface
                     'shipped_at'  => now(),
                     'print_count' => 1,
                 ]);
+
+                $this->notifyUsers(
+                    $this->departmentUsers((int) $request->department_id),
+                    new TransferRequestNotification($request, TransferRequestNotification::SHIPPED)
+                );
             }
 
             // Muat ulang supaya relasi receiptOfGoods yang baru ikut terbaca.
@@ -679,12 +723,19 @@ class TransferRequestService implements TransferRequestServiceInterface
                 ]);
             }
 
-            return $this->transferRequestRepository->update($id, [
+            $updated = $this->transferRequestRepository->update($id, [
                 'status'        => TransferRequest::STATUS_RECEIVED,
                 'received_by'   => $receivedBy,
                 'received_at'   => now(),
                 'received_date' => $transDate->toDateString(),
             ]);
+
+            $this->notifyUsers(
+                $this->requesterUser($request),
+                new TransferRequestNotification($request, TransferRequestNotification::RECEIVED)
+            );
+
+            return $updated;
         });
     }
 
@@ -841,5 +892,42 @@ class TransferRequestService implements TransferRequestServiceInterface
         if ((int) $user->department_id !== (int) $request->department_id) {
             throw new \Exception("Hanya department tujuan yang dapat mengkonfirmasi penerimaan barang.");
         }
+    }
+
+       /* ================= NOTIFIKASI ================= */
+
+    /**
+     * Kirim notifikasi tanpa mengganggu transaksi utama.
+     *
+     * Kegagalan kirim (relasi null, tabel penuh, dll) tidak boleh
+     * membatalkan pemotongan stok yang sudah benar — cukup dicatat
+     * di log.
+     */
+    private function notifyUsers($users, TransferRequestNotification $notification): void
+    {
+        try {
+            foreach ($users as $user) {
+                $user->notify($notification);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Gagal mengirim notifikasi transfer: ' . $e->getMessage());
+        }
+    }
+
+    /** Approver IMC — diambil dari tabel transfer_approvers. */
+    private function approverUsers()
+    {
+        return User::whereHas('transferApprover')->get();
+    }
+
+    /** Semua user di department tujuan. */
+    private function departmentUsers(int $departmentId)
+    {
+        return User::where('department_id', $departmentId)->get();
+    }
+
+    private function requesterUser(TransferRequest $request)
+    {
+        return User::where('id', $request->requested_by)->get();
     }
 }
