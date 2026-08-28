@@ -141,6 +141,36 @@ class ItemLocationService implements ItemLocationServiceInterface
     }
 
     /**
+     * Buang lot yang rusak atau kedaluwarsa.
+     *
+     * Stok dinolkan dan lot ditandai dibuang — barisnya TIDAK
+     * dihapus supaya jejak audit tetap ada dan detail transfer
+     * lama masih bisa merujuknya.
+     *
+     * Ledger dicatat oleh pemanggil, bukan di sini, supaya service
+     * ini tidak bergantung pada StockLedgerService.
+     */
+    public function disposeLot(int $itemLocationId, int $disposedBy, string $reason): ItemLocation
+    {
+        $lot = $this->itemLocationRepository->getByIdForUpdate($itemLocationId);
+
+        if ($lot->disposed_at !== null) {
+            throw new \Exception("Lot ini sudah dibuang sebelumnya.");
+        }
+
+        if ((float) $lot->qty_weight <= 0) {
+            throw new \Exception("Lot ini sudah tidak memiliki stok.");
+        }
+
+        return $this->itemLocationRepository->update($itemLocationId, [
+            'qty_weight'      => 0,
+            'disposed_at'     => now(),
+            'disposed_by'     => $disposedBy,
+            'disposal_reason' => $reason,
+        ]);
+    }
+
+    /**
      * Buat lot baru. Menggantikan addOrMergeLot() — lot hasil transfer
      * TIDAK PERNAH digabung dengan lot lama, supaya jejak tiap
      * pengiriman tetap terlihat dan FEFO di gudang tujuan tidak kabur.

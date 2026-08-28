@@ -165,6 +165,7 @@ class RoleController extends Controller
             'item-locations.create' => 'Tambah Stok Gudang',
             'item-locations.update' => 'Edit Stok Gudang',
             'item-locations.delete' => 'Hapus Stok Gudang',
+            'item-locations.dispose' => 'Buang Lot (Disposal)',
 
             'transactions.porc.view'   => 'Lihat Transaksi Supply Oil (PORC)',
             'transactions.porc.create' => 'Input Supply Oil (PORC)',
@@ -199,7 +200,7 @@ class RoleController extends Controller
             'Department'       => ['departments.view', 'departments.create', 'departments.update', 'departments.delete'],
             'Gudang'           => ['warehouses.view', 'warehouses.create', 'warehouses.update', 'warehouses.delete'],
             'Item Master'      => ['items.view', 'items.create', 'items.update', 'items.delete'],
-            'Stok Gudang'      => ['item-locations.view', 'item-locations.create', 'item-locations.update', 'item-locations.delete'],
+            'Stok Gudang'      => ['item-locations.view', 'item-locations.create', 'item-locations.update', 'item-locations.delete', 'item-locations.dispose'],
             'Transaksi - Supply Oil (PORC)' => [
                 'transactions.porc.view',
                 'transactions.porc.create',

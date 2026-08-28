@@ -42,6 +42,7 @@ class RolesAndPermissionSeeder extends Seeder
             'item-locations.create',
             'item-locations.update',
             'item-locations.delete',
+            'item-locations.dispose',
 
             // Transaksi
             // PORC hanya di gudang IMC. CONS & ADJ hanya di gudang

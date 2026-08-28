@@ -75,4 +75,9 @@ interface ItemLocationServiceInterface
 
     /** Package yang sudah dipesan request lain yang masih new. */
     public function getReservedPackage(int $itemId, int $demanderId, float $perPackage, ?int $excludeRequestId = null): float;
+    /**
+     * Buang lot. Data tetap tersimpan untuk audit, hanya
+     * dikeluarkan dari FEFO lewat scope available().
+     */
+    public function disposeLot(int $itemLocationId, int $disposedBy, string $reason): ItemLocation;
 }

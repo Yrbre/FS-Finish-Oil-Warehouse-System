@@ -111,6 +111,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('can:item-locations.delete')->group(function () {
         Route::delete('item-locations/{id}', [ItemLocationController::class, 'destroy'])->name('item-locations.destroy');
     });
+    Route::middleware('can:item-locations.dispose')->group(function () {
+        Route::post('item-locations/{id}/dispose', [ItemLocationController::class, 'dispose'])
+            ->name('item-locations.dispose');
+    });
 });
 
 /*

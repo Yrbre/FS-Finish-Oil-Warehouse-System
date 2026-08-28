@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\DisposalRequest;
 use App\Http\Requests\ItemLocationRequest;
+use App\Services\DisposalService;
 use App\Services\Interfaces\DepartmentServiceInterface;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\ItemServiceInterface;
@@ -19,19 +21,22 @@ class ItemLocationController extends Controller
     protected WarehouseServiceInterface $warehouseService;
     protected StockLedgerServiceInterface $stockLedgerService;
     protected DepartmentServiceInterface $departmentService;
+    protected DisposalService $disposalService;
 
     public function __construct(
         ItemLocationServiceInterface $itemLocationService,
         ItemServiceInterface $itemService,
         WarehouseServiceInterface $warehouseService,
         StockLedgerServiceInterface $stockLedgerService,
-        DepartmentServiceInterface $departmentService
+        DepartmentServiceInterface $departmentService,
+        DisposalService $disposalService
     ) {
         $this->itemLocationService = $itemLocationService;
         $this->itemService         = $itemService;
         $this->warehouseService    = $warehouseService;
         $this->stockLedgerService  = $stockLedgerService;
         $this->departmentService   = $departmentService;
+        $this->disposalService     = $disposalService;
     }
 
     public function index(Request $request)
@@ -82,6 +87,13 @@ class ItemLocationController extends Controller
 
                         if (auth()->user()->can('item-locations.update')) {
                             $btns .= '<a href="' . route('item-locations.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                        }
+
+                        if (auth()->user()->can('item-locations.dispose') && (float) $row->qty_weight > 0) {
+                            $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-dispose"
+                                data-id="' . $row->id . '"
+                                data-name="' . e($row->receiving_lot ?? $row->item->item_desc) . '"
+                                data-qty="' . number_format((float) $row->qty_weight, 2, ',', '.') . '">Buang</button>';
                         }
 
                         return $btns ?: '<span class="text-muted">-</span>';
@@ -148,6 +160,24 @@ class ItemLocationController extends Controller
                 ->with('success', 'Stok gudang berhasil dihapus.');
         } catch (\Exception $e) {
             Log::error('Gagal menghapus item location: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function dispose(DisposalRequest $request, string $id)
+    {
+        try {
+            $this->disposalService->dispose(
+                (int) $id,
+                auth()->id(),
+                $request->validated()['disposal_reason']
+            );
+
+            return redirect()->route('item-locations.index')
+                ->with('success', 'Lot berhasil dibuang. Stok dikeluarkan dari perhitungan.');
+        } catch (\Exception $e) {
+            Log::error('Gagal membuang lot: ' . $e->getMessage());
 
             return redirect()->back()->with('error', $e->getMessage());
         }
