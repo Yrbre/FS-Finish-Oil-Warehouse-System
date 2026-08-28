@@ -44,6 +44,11 @@ class RolesAndPermissionSeeder extends Seeder
             'item-locations.delete',
             'item-locations.dispose',
 
+            // Item Locations (Stok Gudang)
+            // Kebutuhan Untuk Relocation Stock Gudang
+            'relocations.view',
+            'relocations.create',
+
             // Transaksi
             // PORC hanya di gudang IMC. CONS & ADJ hanya di gudang
             // department — aturan zona ini ditegakkan guardZone()

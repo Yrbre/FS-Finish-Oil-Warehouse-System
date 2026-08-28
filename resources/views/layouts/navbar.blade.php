@@ -86,18 +86,24 @@
                 @endcanany
 
                 {{-- Inventory --}}
-                @can('item-locations.view')
+                @canany(['item-locations.view', 'relocations.view'])
                     <li class="nav-item dropdown">
                         <a href="#" id="inventoryDropdown" class="dropdown-toggle nav-link" role="button"
                             data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                             <span class="ml-lg-2">Inventory</span>
                         </a>
                         <div class="dropdown-menu" aria-labelledby="inventoryDropdown">
-                            <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span
-                                    class="ml-1">Item Onhand</span></a>
+                            @can('item-locations.view')
+                                <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span
+                                        class="ml-1">Item Onhand</span></a>
+                            @endcan
+                            @can('relocations.view')
+                                <a class="nav-link pl-lg-2" href="{{ route('relocations.index') }}"><span class="ml-1">Pindah
+                                        Lokasi</span></a>
+                            @endcan
                         </div>
                     </li>
-                @endcan
+                @endcanany
 
                 {{-- Laporan --}}
                 @can('reports.view')
@@ -118,8 +124,8 @@
         <ul class="navbar-nav d-flex flex-row">
             @include('components.notification-bell')
             <li class="nav-item dropdown ml-lg-0">
-                <a class="nav-link dropdown-toggle text-muted" href="#" id="navbarDropdownMenuLink" role="button"
-                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <a class="nav-link dropdown-toggle text-muted" href="#" id="navbarDropdownMenuLink"
+                    role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                     <span class="avatar avatar-sm mt-2">
                         <img src="{{ asset('design/dark/assets/avatars/face-1.jpg') }}" alt="..."
                             class="avatar-img rounded-circle">

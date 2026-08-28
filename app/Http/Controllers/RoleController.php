@@ -156,6 +156,9 @@ class RoleController extends Controller
             'warehouses.update'  => 'Edit Gudang',
             'warehouses.delete'  => 'Hapus Gudang',
 
+            'relocations.view'   => 'Lihat Riwayat Pindah Lokasi',
+            'relocations.create' => 'Pindahkan Lokasi Barang',
+
             'items.view'   => 'Lihat Item & Kartu Stok',
             'items.create' => 'Tambah Item',
             'items.update' => 'Edit Item',
@@ -199,6 +202,7 @@ class RoleController extends Controller
         $groups = [
             'Department'       => ['departments.view', 'departments.create', 'departments.update', 'departments.delete'],
             'Gudang'           => ['warehouses.view', 'warehouses.create', 'warehouses.update', 'warehouses.delete'],
+            'Pindah Lokasi'    => ['relocations.view', 'relocations.create'],
             'Item Master'      => ['items.view', 'items.create', 'items.update', 'items.delete'],
             'Stok Gudang'      => ['item-locations.view', 'item-locations.create', 'item-locations.update', 'item-locations.delete', 'item-locations.dispose'],
             'Transaksi - Supply Oil (PORC)' => [

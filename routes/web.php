@@ -6,6 +6,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemLocationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RelocationController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\TransactionController;
@@ -278,6 +279,21 @@ Route::middleware('auth')->group(function () {
     Route::get('notifications/latest', [NotificationController::class, 'latest'])->name('notifications.latest');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
     Route::get('notifications/{id}/read', [NotificationController::class, 'read'])->name('notifications.read');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Pindah Lokasi (antar gudang IMC)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::middleware('can:relocations.view')->group(function () {
+        Route::get('relocations', [RelocationController::class, 'index'])->name('relocations.index');
+    });
+    Route::middleware('can:relocations.create')->group(function () {
+        Route::get('relocations/create', [RelocationController::class, 'create'])->name('relocations.create');
+        Route::post('relocations', [RelocationController::class, 'store'])->name('relocations.store');
+    });
 });
 
 require __DIR__ . '/auth.php';
