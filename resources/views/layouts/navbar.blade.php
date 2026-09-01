@@ -25,7 +25,7 @@
                 </li>
 
                 {{-- Master Data — tampil kalau user punya salah satu permission master --}}
-                @canany(['departments.view', 'warehouses.view', 'users.view'])
+                @canany(['departments.view', 'warehouses.view', 'users.view', 'minimum-stocks.view'])
                     <li class="nav-item dropdown">
                         <a href="#" id="masterDropdown" class="dropdown-toggle nav-link" role="button"
                             data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -47,6 +47,10 @@
                             @can('roles.view')
                                 <a class="nav-link pl-lg-2" href="{{ route('roles.index') }}"><span
                                         class="ml-1">Roles</span></a>
+                            @endcan
+                            @can('minimum-stocks.view')
+                                <a class="nav-link pl-lg-2" href="{{ route('minimum-stocks.index') }}"><span
+                                        class="ml-1">Minimum Stock</span></a>
                             @endcan
                         </div>
                     </li>
@@ -88,7 +92,8 @@
                         </a>
                         <div class="dropdown-menu" aria-labelledby="inventoryDropdown">
                             @can('item-locations.view')
-                                <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span class="ml-1">Item
+                                <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span
+                                        class="ml-1">Item
                                         Onhand</span></a>
                             @endcan
                             @can('relocations.view')

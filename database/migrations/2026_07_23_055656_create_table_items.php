@@ -17,7 +17,6 @@ return new class extends Migration
             $table->string('item_desc');
             $table->string('item_uom');
             $table->string('item_glclass');
-            $table->decimal('min_stock', 15, 2)->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

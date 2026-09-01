@@ -9,7 +9,6 @@ use App\Models\User;
 use App\Notifications\MinimumStockAlert;
 use App\Notifications\NearExpiryAlert;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class StockAlertService
 {
@@ -24,7 +23,14 @@ class StockAlertService
      */
     public function checkMinimumStock(): int
     {
-        $items = Item::whereNotNull('min_stock')->where('min_stock', '>', 0)->get();
+        // Item dipantau kalau punya min_stock global ATAU punya
+        // pengaturan khusus per department.
+        $items = Item::with('minimumStocks')
+            ->where(function ($q) {
+                $q->where('min_stock', '>', 0)
+                    ->orWhereHas('minimumStocks', fn($q2) => $q2->where('is_active', true));
+            })
+            ->get();
 
         if ($items->isEmpty()) {
             return 0;
@@ -34,9 +40,6 @@ class StockAlertService
         $sent = 0;
 
         foreach ($items as $item) {
-            // Hanya department yang benar-benar memiliki (atau pernah
-            // memiliki) stok item ini — supaya department yang tidak
-            // pernah memakainya tidak ikut diperingatkan.
             $owners = ItemLocation::where('item_id', $item->id)
                 ->whereNull('deleted_at')
                 ->select('demander_id')
@@ -48,16 +51,22 @@ class StockAlertService
                     continue;
                 }
 
+                $ambang = $item->minStockFor((int) $demanderId);
+
+                // Null = department ini tidak memantau item tersebut.
+                if ($ambang === null || $ambang <= 0) {
+                    continue;
+                }
+
                 $total = (float) ItemLocation::where('item_id', $item->id)
                     ->where('demander_id', $demanderId)
                     ->available()
                     ->sum('qty_weight');
 
-                if ($total >= (float) $item->min_stock) {
+                if ($total >= $ambang) {
                     continue;
                 }
 
-                // Yang sudah ada di gudang sendiri — sisanya masih di IMC.
                 $local = (float) ItemLocation::where('item_id', $item->id)
                     ->where('demander_id', $demanderId)
                     ->whereNotIn('warehouse_id', $imcWarehouseIds)
@@ -70,14 +79,8 @@ class StockAlertService
                     continue;
                 }
 
-                $users = $this->departmentUsers($demanderId);
-
-                if ($users->isEmpty()) {
-                    continue;
-                }
-
-                foreach ($users as $user) {
-                    $user->notify(new MinimumStockAlert($item, $department, $total, $local));
+                foreach ($this->departmentUsers((int) $demanderId) as $user) {
+                    $user->notify(new MinimumStockAlert($item, $department, $total, $local, $ambang));
                     $sent++;
                 }
             }

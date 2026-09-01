@@ -164,6 +164,11 @@ class RoleController extends Controller
             'items.update' => 'Edit Item',
             'items.delete' => 'Hapus Item',
 
+            'minimum-stocks.view'   => 'Lihat Minimum Stock',
+            'minimum-stocks.create' => 'Tambah Minimum Stock',
+            'minimum-stocks.update' => 'Edit Minimum Stock',
+            'minimum-stocks.delete' => 'Hapus Minimum Stock',
+
             'item-locations.view'   => 'Lihat Stok Gudang',
             'item-locations.create' => 'Tambah Stok Gudang',
             'item-locations.update' => 'Edit Stok Gudang',
@@ -204,6 +209,12 @@ class RoleController extends Controller
             'Gudang'           => ['warehouses.view', 'warehouses.create', 'warehouses.update', 'warehouses.delete'],
             'Pindah Lokasi'    => ['relocations.view', 'relocations.create'],
             'Item Master'      => ['items.view', 'items.create', 'items.update', 'items.delete'],
+            'Minimum Stock' => [
+                'minimum-stocks.view',
+                'minimum-stocks.create',
+                'minimum-stocks.update',
+                'minimum-stocks.delete',
+            ],
             'Stok Gudang'      => ['item-locations.view', 'item-locations.create', 'item-locations.update', 'item-locations.delete', 'item-locations.dispose'],
             'Transaksi - Supply Oil (PORC)' => [
                 'transactions.porc.view',

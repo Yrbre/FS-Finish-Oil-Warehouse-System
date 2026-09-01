@@ -17,6 +17,7 @@ class MinimumStockAlert extends Notification
         protected Department $department,
         protected float $currentStock,
         protected float $localStock,
+        protected float $minStock,
     ) {}
 
     /**

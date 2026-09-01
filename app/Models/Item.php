@@ -41,4 +41,28 @@ class Item extends Model
     {
         return $this->min_stock !== null && (float) $this->min_stock > 0;
     }
+
+    public function minimumStocks()
+    {
+        return $this->hasMany(MinimumStock::class);
+    }
+
+    /**
+     * Ambang minimum untuk sebuah department.
+     *
+     * Pengaturan per department menimpa nilai global di items —
+     * kalau belum diatur, dipakai min_stock item sebagai default.
+     * Null berarti item ini tidak dipantau untuk department itu.
+     */
+    public function minStockFor(int $departmentId): ?float
+    {
+        $specific = $this->minimumStocks
+            ->firstWhere(fn($m) => $m->department_id === $departmentId && $m->is_active);
+
+        if ($specific) {
+            return (float) $specific->min_stock;
+        }
+
+        return $this->min_stock !== null ? (float) $this->min_stock : null;
+    }
 }

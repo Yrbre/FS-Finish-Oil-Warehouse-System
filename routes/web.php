@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemLocationController;
+use App\Http\Controllers\MinimumStockController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RelocationController;
@@ -99,6 +100,28 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('can:items.delete')->group(function () {
         Route::delete('items/{id}', [ItemController::class, 'destroy'])->name('items.destroy');
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Minimum Stock
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::middleware('can:minimum-stocks.view')->group(function () {
+        Route::get('minimum-stocks', [MinimumStockController::class, 'index'])->name('minimum-stocks.index');
+    });
+    Route::middleware('can:minimum-stocks.create')->group(function () {
+        Route::get('minimum-stocks/create', [MinimumStockController::class, 'create'])->name('minimum-stocks.create');
+        Route::post('minimum-stocks', [MinimumStockController::class, 'store'])->name('minimum-stocks.store');
+    });
+    Route::middleware('can:minimum-stocks.update')->group(function () {
+        Route::get('minimum-stocks/{id}/edit', [MinimumStockController::class, 'edit'])->name('minimum-stocks.edit');
+        Route::put('minimum-stocks/{id}', [MinimumStockController::class, 'update'])->name('minimum-stocks.update');
+    });
+    Route::middleware('can:minimum-stocks.delete')->group(function () {
+        Route::delete('minimum-stocks/{id}', [MinimumStockController::class, 'destroy'])->name('minimum-stocks.destroy');
     });
 });
 

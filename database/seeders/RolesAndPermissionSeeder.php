@@ -35,6 +35,12 @@ class RolesAndPermissionSeeder extends Seeder
             'items.update',
             'items.delete',
 
+            // Minimum Stock
+            'minimum-stocks.view',
+            'minimum-stocks.create',
+            'minimum-stocks.update',
+            'minimum-stocks.delete',
+
             // Item Locations (Stok Gudang)
             // 'item-locations.create' dipertahankan untuk kompatibilitas,
             // tapi routenya dinonaktifkan — stok awal kini lewat PORC.
