@@ -45,7 +45,7 @@
                             @enderror
                         </div>
 
-                        <div class="form-group">
+                        {{-- <div class="form-group">
                             <label>Minimum Stock (KG)</label>
                             <input type="number" step="0.01" min="0" class="form-control" name="min_stock"
                                 value="{{ old('min_stock') }}">
@@ -53,7 +53,7 @@
                                 Ambang peringatan per department: stok di gudang sendiri + titipan di IMC.
                                 Kosongkan bila item ini tidak perlu dipantau.
                             </small>
-                        </div>
+                        </div> --}}
 
                         <div class="form-group">
                             <label for="item_uom">Satuan (UOM) <span class="text-danger">*</span></label>

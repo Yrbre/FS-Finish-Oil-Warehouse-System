@@ -64,73 +64,7 @@
                 @endcan
             </div>
 
-            {{-- ===== Rekap transfer selesai (khusus IMC) ===== --}}
-            @role('imc')
-                <div class="card shadow mb-4">
-                    <div class="card-header">
-                        <div class="row align-items-center">
-                            <div class="col">
-                                <strong class="card-title">Rekap Transfer Selesai</strong>
-                                <br><small class="text-muted">Berdasarkan tanggal barang diterima.</small>
-                            </div>
-                            <div class="col-auto">
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <button type="button" class="btn btn-outline-secondary btn-range" data-range="today">Hari
-                                        Ini</button>
-                                    <button type="button" class="btn btn-outline-secondary btn-range" data-range="month">Bulan
-                                        Ini</button>
-                                    <button type="button" class="btn btn-outline-secondary btn-range active"
-                                        data-range="year">Tahun Ini</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div class="card-body">
-                        <div class="form-row mb-3">
-                            <div class="col-md-3">
-                                <label class="small text-muted">Dari</label>
-                                <input type="date" id="sumFrom" class="form-control form-control-sm"
-                                    value="{{ now()->startOfYear()->toDateString() }}">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="small text-muted">Sampai</label>
-                                <input type="date" id="sumTo" class="form-control form-control-sm"
-                                    value="{{ now()->toDateString() }}">
-                            </div>
-                            <div class="col-md-2 d-flex align-items-end">
-                                <button type="button" class="btn btn-sm btn-primary" id="btnLoadSummary">
-                                    <span class="fe fe-search fe-16 mr-1"></span>Tampilkan
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="row text-center mb-4">
-                            <div class="col-md-3">
-                                <p class="small text-muted mb-1 text-uppercase">Request Selesai</p>
-                                <span class="h4" id="statRequest">-</span>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="small text-muted mb-1 text-uppercase">Item Terkirim</p>
-                                <span class="h4" id="statItem">-</span>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="small text-muted mb-1 text-uppercase">Total Package</p>
-                                <span class="h4" id="statPackage">-</span>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="small text-muted mb-1 text-uppercase">Total Berat (KG)</p>
-                                <span class="h4" id="statWeight">-</span>
-                            </div>
-                        </div>
-
-                        <p class="small text-muted text-uppercase mb-2">Daftar Pengiriman</p>
-                        <div id="sumRequestList">
-                            <p class="text-muted text-center py-3 mb-0">Memuat...</p>
-                        </div>
-                    </div>
-                </div>
-            @endrole
 
             <div class="row">
                 {{-- ===== Transaksi terbaru ===== --}}
@@ -217,6 +151,73 @@
                     </div>
                 </div>
             </div>
+            {{-- ===== Rekap transfer selesai (khusus IMC) ===== --}}
+            @role('imc')
+                <div class="card shadow mb-4">
+                    <div class="card-header">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <strong class="card-title">Rekap Transfer Selesai</strong>
+                                <br><small class="text-muted">Berdasarkan tanggal barang diterima.</small>
+                            </div>
+                            <div class="col-auto">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-outline-secondary btn-range" data-range="today">Hari
+                                        Ini</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-range" data-range="month">Bulan
+                                        Ini</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-range active"
+                                        data-range="year">Tahun Ini</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="form-row mb-3">
+                            <div class="col-md-3">
+                                <label class="small text-muted">Dari</label>
+                                <input type="date" id="sumFrom" class="form-control form-control-sm"
+                                    value="{{ now()->startOfYear()->toDateString() }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small text-muted">Sampai</label>
+                                <input type="date" id="sumTo" class="form-control form-control-sm"
+                                    value="{{ now()->toDateString() }}">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="button" class="btn btn-sm btn-primary" id="btnLoadSummary">
+                                    <span class="fe fe-search fe-16 mr-1"></span>Tampilkan
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="row text-center mb-4">
+                            <div class="col-md-3">
+                                <p class="small text-muted mb-1 text-uppercase">Request Selesai</p>
+                                <span class="h4" id="statRequest">-</span>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="small text-muted mb-1 text-uppercase">Item Terkirim</p>
+                                <span class="h4" id="statItem">-</span>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="small text-muted mb-1 text-uppercase">Total Package</p>
+                                <span class="h4" id="statPackage">-</span>
+                            </div>
+                            <div class="col-md-3">
+                                <p class="small text-muted mb-1 text-uppercase">Total Berat (KG)</p>
+                                <span class="h4" id="statWeight">-</span>
+                            </div>
+                        </div>
+
+                        <p class="small text-muted text-uppercase mb-2">Daftar Pengiriman</p>
+                        <div id="sumRequestList">
+                            <p class="text-muted text-center py-3 mb-0">Memuat...</p>
+                        </div>
+                    </div>
+                </div>
+            @endrole
 
         </div>
     </div>
@@ -251,7 +252,7 @@
                 if (!res.requests.length) {
                     $('#sumRequestList').html(
                         '<p class="text-muted text-center py-3 mb-0">Tidak ada pengiriman pada rentang ini.</p>'
-                        );
+                    );
                     return;
                 }
 
