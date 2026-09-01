@@ -6,9 +6,10 @@
     <style>
         @page {
             size: letter portrait;
-            /* Margin 0 supaya posisi blok dihitung dari tepi fisik
-               kertas — batas potong harus tepat di tengah lembar. */
-            margin: 0;
+            /* Printer tidak bisa mencetak sampai tepi fisik kertas
+               (umumnya 4-6mm). Tanpa margin, border kotak teratas
+               dan terbawah terpotong. */
+            margin: 0.5cm;
         }
 
         body {
@@ -19,15 +20,21 @@
             padding: 0;
         }
 
-        /* Setengah lembar = 396pt (letter 792pt / 2 = 13,97cm).
-           Sengaja pakai pt, bukan cm — 14cm x 2 melebihi tinggi
-           letter dan membuat blok kedua pindah halaman. */
-        .half {
-            /* 380pt x 2 = 760pt, menyisakan 32pt sebagai cadangan.
-               DomPDF mengabaikan box-sizing: border-box, jadi padding
-               dan border ditambahkan DI LUAR tinggi ini — karena itu
-               padding dipindah ke .ttb-box. */
-            height: 380pt;
+        /* Blok ATAS setinggi setengah kertas dikurangi margin:
+           396pt (tengah letter) - 14,17pt (margin) = 381,83pt.
+           Dengan begitu garis potong jatuh tepat 14cm dari tepi. */
+        .half-top {
+            height: 382pt;
+            width: 100%;
+            overflow: hidden;
+            page-break-inside: avoid;
+        }
+
+        /* Blok BAWAH cukup setinggi isinya. Kalau dibuat 382pt juga,
+           totalnya 764pt — melewati area cetak 763,65pt dan blok
+           kedua terlempar ke halaman berikutnya. */
+        .half-bottom {
+            height: 270pt;
             width: 100%;
             overflow: hidden;
             page-break-inside: avoid;
@@ -58,10 +65,10 @@
         }
 
         .ttb-box {
-            /* Lebar terpakai 20,99cm / 2 = 10,49cm per kolom.
-               9,5cm memberi ruang aman untuk border & pembulatan DomPDF. */
             width: 9.5cm;
-            height: 12.8cm;
+            /* Dari 12,4cm — sisa ruang di bawah tanda tangan
+               dipangkas supaya tidak ada area kosong yang lebar. */
+            height: 9cm;
             box-sizing: border-box;
             border: 1px solid #000;
             padding: 0.2cm;
@@ -184,7 +191,7 @@
             @if ($halfIndex === 1)
                 <div class="cut-line"></div>
             @endif
-            <div class="half">
+            <div class="{{ $halfIndex === 0 ? 'half-top' : 'half-bottom' }}">
                 <table class="grid-wrapper">
                     <tr>
                         @foreach ($half as $transferRequest)
