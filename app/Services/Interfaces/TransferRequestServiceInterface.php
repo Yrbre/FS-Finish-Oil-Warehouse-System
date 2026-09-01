@@ -37,4 +37,6 @@ interface TransferRequestServiceInterface
      * asal. Hanya IMC, dan hanya sebelum TTB terbit.
      */
     public function cancelApprovedItem(int $itemId, int $cancelledBy, string $reason);
+
+    public function getReceivedSummary(string $from, string $to): array;
 }

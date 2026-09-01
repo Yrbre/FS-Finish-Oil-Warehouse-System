@@ -62,11 +62,13 @@ interface ItemLocationRepositoryInterface
 
     /* ---------------- Report ---------------- */
 
-    public function getGrandTotalStock(): float;
+    /** Total stok. $demanderId membatasi ke milik satu department. */
+    public function getGrandTotalStock(?int $demanderId = null): float;
 
-    public function getNearExpiring(int $days = 30, int $limit = 10);
+    /** Lot mendekati kedaluwarsa. $demanderId membatasi ke milik satu department. */
+    public function getNearExpiring(int $days = 30, int $limit = 10, ?int $demanderId = null);
 
-    public function getStockSummaryByWarehouse();
+    public function getStockSummaryByWarehouse(?int $demanderId = null);
 
     /**
      * Package yang sudah "dipesan" oleh request lain yang masih new.
@@ -91,4 +93,11 @@ interface ItemLocationRepositoryInterface
     public function getFefoLotsForConsForUpdate(int $itemId, int $warehouseId, int $demanderId): Collection;
 
     public function getFefoLotsForTransferForUpdate(int $itemId, int $demanderId, array $warehouseIds, float $perPackage): Collection;
+
+    /**
+     * Rekap stok milik satu department, dikelompokkan per item.
+     * Memisahkan yang masih dititipkan di IMC dari yang sudah
+     * ada di gudang department sendiri.
+     */
+    public function getDemanderStockSummary(int $demanderId, array $imcWarehouseIds): Collection;
 }

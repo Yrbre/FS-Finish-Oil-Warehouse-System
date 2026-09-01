@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ItemRequest;
 use App\Services\Interfaces\DepartmentServiceInterface;
-use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\ItemServiceInterface;
 use App\Services\Interfaces\StockLedgerServiceInterface;
 use App\Services\Interfaces\WarehouseServiceInterface;
@@ -34,46 +33,97 @@ class ItemController extends Controller
     public function index(Request $request)
     {
         try {
-            // Route sudah dijaga middleware can:items.view, tapi tombol
-            // Edit/Hapus di kolom action tetap perlu dicek permission
-            // spesifiknya masing-masing.
+            $user = auth()->user();
+
+            // IMC & admin melihat total seluruh department. Staff
+            // melihat miliknya sendiri, dipisah antara yang masih
+            // dititipkan di IMC dan yang sudah di gudang sendiri.
+            $isImc = $user->department?->code === \App\Models\Department::CODE_IMC
+                || $user->hasRole('admin');
+
             if ($request->ajax()) {
-                $items = $this->itemService->getAll()
-                    ->withSum(
-                        ['itemLocations as total_stock' => fn($q) => $q
-                            ->whereNull('disposed_at')
-                            ->where('qty_weight', '>', 0)],
+                $items = $this->itemService->getAll();
+
+                $imcIds = $this->warehouseService->getIdsByDepartmentCode(\App\Models\Department::CODE_IMC);
+
+                if ($isImc) {
+                    // Yang dikelola IMC adalah gudangnya sendiri —
+                    // stok yang sudah diserahkan ke department bukan
+                    // lagi tanggung jawabnya.
+                    $items->withSum(
+                        ['itemLocations as imc_stock' => fn($q) => $q
+                            ->whereNull('disposed_at')->where('qty_weight', '>', 0)
+                            ->whereIn('warehouse_id', $imcIds)],
                         'qty_weight'
                     );
+                } else {
+                    $demanderId = (int) $user->department_id;
 
-                return DataTables::of($items)
-                    ->addIndexColumn()
-                    ->addColumn('total_stock', fn($row) =>
-                    number_format((float) ($row->total_stock ?? 0), 2, ',', '.') . ' ' . $row->item_uom)
-                    ->addColumn('action', function ($row) {
-                        $btns = '<a href="' . route('items.detail', $row->id) . '" class="btn btn-sm btn-info">Kartu Stok</a>';
+                    $items->withSum(
+                        ['itemLocations as imc_stock' => fn($q) => $q
+                            ->whereNull('disposed_at')->where('qty_weight', '>', 0)
+                            ->where('demander_id', $demanderId)
+                            ->whereIn('warehouse_id', $imcIds)],
+                        'qty_weight'
+                    )->withSum(
+                        ['itemLocations as local_stock' => fn($q) => $q
+                            ->whereNull('disposed_at')->where('qty_weight', '>', 0)
+                            ->where('demander_id', $demanderId)
+                            ->whereNotIn('warehouse_id', $imcIds)],
+                        'qty_weight'
+                    );
+                }
 
-                        if (auth()->user()->can('items.update')) {
-                            $btns .= ' <a href="' . route('items.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
-                        }
+                $dt = DataTables::of($items)->addIndexColumn();
 
-                        if (auth()->user()->can('items.delete')) {
-                            $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-delete"
-                                data-id="' . $row->id . '"
-                                data-name="' . e($row->item_desc) . '"
-                                data-url="' . route('items.destroy', $row->id) . '">Hapus</button>';
-                        }
+                $dt->addColumn('imc_stock', fn($row) =>
+                number_format((float) ($row->imc_stock ?? 0), 2, ',', '.') . ' ' . $row->item_uom);
 
-                        return $btns;
+                if (! $isImc) {
+                    $dt->addColumn('local_stock', function ($row) {
+                        $local = (float) ($row->local_stock ?? 0);
+                        $imc   = (float) ($row->imc_stock ?? 0);
+                        $text  = number_format($local, 2, ',', '.') . ' ' . $row->item_uom;
+
+                        // Habis di gudang padahal masih ada titipan
+                        // di IMC — waktunya buat transfer request.
+                        return ($local <= 0 && $imc > 0)
+                            ? '<span class="text-danger">' . $text . '</span>'
+                            : $text;
                     })
-                    ->addColumn('min_stock', fn($row) => $row->min_stock
-                        ? number_format((float) $row->min_stock, 2, ',', '.') . ' ' . $row->item_uom
-                        : '<span class="text-muted">-</span>')
-                    ->rawColumns(['action', 'min_stock'])
-                    ->make(true);
+                        ->addColumn('total_stock', function ($row) {
+                            $total = (float) ($row->imc_stock ?? 0) + (float) ($row->local_stock ?? 0);
+                            $text  = '<strong>' . number_format($total, 2, ',', '.') . ' ' . $row->item_uom . '</strong>';
+
+                            if ($row->min_stock !== null && $total < (float) $row->min_stock) {
+                                return $text . '<br><span class="badge badge-warning">Di bawah minimum</span>';
+                            }
+
+                            return $text;
+                        });
+                }
+
+                $dt->addColumn('action', function ($row) {
+                    $btns = '<a href="' . route('items.detail', $row->id) . '" class="btn btn-sm btn-info">Kartu Stok</a>';
+
+                    if (auth()->user()->can('items.update')) {
+                        $btns .= ' <a href="' . route('items.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                    }
+
+                    if (auth()->user()->can('items.delete')) {
+                        $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-delete"
+                            data-id="' . $row->id . '"
+                            data-name="' . e($row->item_desc) . '"
+                            data-url="' . route('items.destroy', $row->id) . '">Hapus</button>';
+                    }
+
+                    return $btns;
+                });
+
+                return $dt->rawColumns(['action', 'local_stock', 'total_stock'])->make(true);
             }
 
-            return view('pages.items.index');
+            return view('pages.items.index', compact('isImc'));
         } catch (\Exception $e) {
             Log::error('Gagal menampilkan item: ' . $e->getMessage());
 

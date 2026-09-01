@@ -219,19 +219,20 @@ class ItemLocationService implements ItemLocationServiceInterface
 
     /* ================= REPORT ================= */
 
-    public function getGrandTotalStock(): float
+    public function getGrandTotalStock(?int $demanderId = null): float
     {
-        return $this->itemLocationRepository->getGrandTotalStock();
+        return $this->itemLocationRepository->getGrandTotalStock($demanderId);
     }
 
-    public function getNearExpiring(int $days = 30, int $limit = 10)
+    public function getNearExpiring(int $days = 30, int $limit = 10, ?int $demanderId = null)
     {
-        return $this->itemLocationRepository->getNearExpiring($days, $limit);
+        return $this->itemLocationRepository->getNearExpiring($days, $limit, $demanderId);
     }
 
-    public function getStockSummaryByWarehouse()
+
+    public function getStockSummaryByWarehouse(?int $demanderId = null)
     {
-        return $this->itemLocationRepository->getStockSummaryByWarehouse();
+        return $this->itemLocationRepository->getStockSummaryByWarehouse($demanderId);
     }
 
     /* ================= PRIVATE ================= */
@@ -274,5 +275,10 @@ class ItemLocationService implements ItemLocationServiceInterface
     public function getReservedPackage(int $itemId, int $demanderId, float $perPackage, ?int $excludeRequestId = null): float
     {
         return $this->itemLocationRepository->getReservedPackage($itemId, $demanderId, $perPackage, $excludeRequestId);
+    }
+
+    public function getDemanderStockSummary(int $demanderId, array $imcWarehouseIds): Collection
+    {
+        return $this->itemLocationRepository->getDemanderStockSummary($demanderId, $imcWarehouseIds);
     }
 }

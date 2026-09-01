@@ -64,11 +64,11 @@ interface ItemLocationServiceInterface
 
     /* ---------------- Report ---------------- */
 
-    public function getGrandTotalStock(): float;
+    public function getGrandTotalStock(?int $demanderId = null): float;
 
-    public function getNearExpiring(int $days = 30, int $limit = 10);
+    public function getNearExpiring(int $days = 30, int $limit = 10, ?int $demanderId = null);
 
-    public function getStockSummaryByWarehouse();
+    public function getStockSummaryByWarehouse(?int $demanderId = null);
 
     /** Semua lot yang bisa dipakai transfer, untuk form alokasi manual. */
     public function getTransferLots(int $itemId, int $demanderId, array $warehouseIds, float $perPackage): Collection;
@@ -80,4 +80,6 @@ interface ItemLocationServiceInterface
      * dikeluarkan dari FEFO lewat scope available().
      */
     public function disposeLot(int $itemLocationId, int $disposedBy, string $reason): ItemLocation;
+
+    public function getDemanderStockSummary(int $demanderId, array $imcWarehouseIds): Collection;
 }

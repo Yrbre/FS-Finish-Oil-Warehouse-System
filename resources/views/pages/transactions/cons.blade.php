@@ -55,7 +55,7 @@
 
                         {{-- Info stok tersedia --}}
                         <div class="alert alert-info d-none" id="stockInfo">
-                            Stok milik department Anda: <strong id="stockValue">0</strong> <span id="stockUom"></span>
+                            Stok milik department Anda: <span id="stockValue">0</span> <span id="stockUom"></span>
                         </div>
 
                         <div class="form-row">

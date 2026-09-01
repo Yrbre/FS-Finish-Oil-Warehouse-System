@@ -926,4 +926,9 @@ class TransferRequestService implements TransferRequestServiceInterface
     {
         return User::where('id', $request->requested_by)->get();
     }
+
+    public function getReceivedSummary(string $from, string $to): array
+    {
+        return $this->transferRequestRepository->getReceivedSummary($from, $to);
+    }
 }

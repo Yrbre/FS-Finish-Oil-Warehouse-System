@@ -7,6 +7,14 @@
             <div class="row align-items-center mb-2">
                 <div class="col">
                     <h2 class="h5 page-title">Master Item Oil</h2>
+                    <p class="text-muted mb-0">
+                        @if ($isImc)
+                            Stok yang dikelola oleh IMC.
+                        @else
+                            Stok milik department Anda — yang masih dititipkan di gudang IMC
+                            maupun yang sudah ada di gudang sendiri.
+                        @endif
+                    </p>
                 </div>
                 <div class="col-auto">
                     @can('items.create')
@@ -28,7 +36,13 @@
                                         <th>Kode Item</th>
                                         <th>Nama Item</th>
                                         <th>Satuan</th>
-                                        <th>Total Stok</th>
+                                        @if ($isImc)
+                                            <th class="text-right">Stok di IMC</th>
+                                        @else
+                                            <th class="text-right">Stok di IMC</th>
+                                            <th class="text-right">Stok di Gudang</th>
+                                            <th class="text-right">Total</th>
+                                        @endif
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>
@@ -45,6 +59,40 @@
 @push('scripts')
     <script>
         $(function() {
+            const isImc = @json($isImc);
+
+            // Staff melihat stoknya dipisah antara yang masih di IMC
+            // dan yang sudah di gudang sendiri — supaya tahu kapan
+            // perlu membuat transfer request.
+            const stockColumns = isImc ? [{
+                data: 'imc_stock',
+                name: 'imc_stock',
+                orderable: false,
+                searchable: false,
+                className: 'text-right'
+            }] : [{
+                    data: 'imc_stock',
+                    name: 'imc_stock',
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-right'
+                },
+                {
+                    data: 'local_stock',
+                    name: 'local_stock',
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-right'
+                },
+                {
+                    data: 'total_stock',
+                    name: 'total_stock',
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-right'
+                },
+            ];
+
             $('#dataTableItem').DataTable({
                 processing: true,
                 serverSide: true,
@@ -68,12 +116,7 @@
                         data: 'item_uom',
                         name: 'item_uom'
                     },
-                    {
-                        data: 'total_stock',
-                        name: 'total_stock',
-                        orderable: false,
-                        searchable: false
-                    },
+                    ...stockColumns,
                     {
                         data: 'action',
                         name: 'action',

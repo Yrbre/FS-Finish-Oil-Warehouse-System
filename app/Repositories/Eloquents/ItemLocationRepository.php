@@ -189,15 +189,19 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
 
     /* ================= REPORT ================= */
 
-    public function getGrandTotalStock(): float
+    public function getGrandTotalStock(?int $demanderId = null): float
     {
-        return (float) $this->model->available()->sum('qty_weight');
+        return (float) $this->model
+            ->when($demanderId, fn($q) => $q->where('demander_id', $demanderId))
+            ->available()
+            ->sum('qty_weight');
     }
 
-    public function getNearExpiring(int $days = 30, int $limit = 10)
+    public function getNearExpiring(int $days = 30, int $limit = 10, ?int $demanderId = null)
     {
         return $this->model
             ->with(['item', 'warehouse', 'demander'])
+            ->when($demanderId, fn($q) => $q->where('demander_id', $demanderId))
             ->available()
             ->whereNotNull('exp_date')
             ->where('exp_date', '<=', now()->addDays($days)->toDateString())
@@ -206,13 +210,16 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
             ->get();
     }
 
-    public function getStockSummaryByWarehouse()
+    public function getStockSummaryByWarehouse(?int $demanderId = null)
     {
         return $this->model
             ->join('warehouses', 'warehouses.id', '=', 'item_locations.warehouse_id')
             ->whereNull('item_locations.deleted_at')
             ->whereNull('item_locations.disposed_at')
             ->where('item_locations.qty_weight', '>', 0)
+            // Query ini pakai join, jadi kolomnya harus diberi prefix
+            // tabel — tanpa itu MySQL menolak karena ambigu.
+            ->when($demanderId, fn($q) => $q->where('item_locations.demander_id', $demanderId))
             ->selectRaw('
                 warehouses.id as warehouse_id,
                 warehouses.name as warehouse_name,
@@ -290,5 +297,56 @@ class ItemLocationRepository implements ItemLocationRepositoryInterface
             ->fefo()
             ->lockForUpdate()
             ->get();
+    }
+
+    public function getDemanderStockSummary(int $demanderId, array $imcWarehouseIds): Collection
+    {
+        $rows = $this->model
+            ->join('items', 'items.id', '=', 'item_locations.item_id')
+            ->whereNull('item_locations.deleted_at')
+            ->whereNull('item_locations.disposed_at')
+            ->where('item_locations.qty_weight', '>', 0)
+            ->where('item_locations.demander_id', $demanderId)
+            ->selectRaw('
+                items.id as item_id,
+                items.item_no,
+                items.item_desc,
+                items.item_uom,
+                items.min_stock,
+                SUM(item_locations.qty_weight) as total_stock
+            ')
+            ->groupBy('items.id', 'items.item_no', 'items.item_desc', 'items.item_uom', 'items.min_stock')
+            ->orderBy('items.item_no')
+            ->get();
+
+        // Stok di IMC dihitung terpisah lalu digabung — memakai
+        // CASE WHEN di query utama menyulitkan bila daftar gudang
+        // IMC kosong.
+        $imcStock = empty($imcWarehouseIds)
+            ? collect()
+            : $this->model
+            ->where('demander_id', $demanderId)
+            ->whereIn('warehouse_id', $imcWarehouseIds)
+            ->available()
+            ->selectRaw('item_id, SUM(qty_weight) as stock')
+            ->groupBy('item_id')
+            ->pluck('stock', 'item_id');
+
+        return $rows->map(function ($row) use ($imcStock) {
+            $imc   = (float) ($imcStock[$row->item_id] ?? 0);
+            $total = (float) $row->total_stock;
+
+            return (object) [
+                'item_id'     => $row->item_id,
+                'item_no'     => $row->item_no,
+                'item_desc'   => $row->item_desc,
+                'item_uom'    => $row->item_uom,
+                'min_stock'   => $row->min_stock !== null ? (float) $row->min_stock : null,
+                'imc_stock'   => $imc,
+                // Sisanya berarti sudah ada di gudang department.
+                'local_stock' => round($total - $imc, 2),
+                'total_stock' => $total,
+            ];
+        });
     }
 }

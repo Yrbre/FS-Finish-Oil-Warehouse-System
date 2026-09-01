@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Department;
 use App\Http\Requests\DisposalRequest;
 use App\Http\Requests\ItemLocationRequest;
 use App\Services\DisposalService;
@@ -43,74 +44,22 @@ class ItemLocationController extends Controller
     {
         try {
             $user = auth()->user();
-            // Pakai relasi department dengan aman — department_id nullable,
-            // dan tanpa ?-> baris ini fatal error untuk user tanpa department.
-            $isImc = $user->department?->code === \App\Models\Department::CODE_IMC;
+
+            // department_id nullable — tanpa ?-> baris ini fatal error
+            // untuk user yang belum terdaftar di department manapun.
+            $isImc = $user->department?->code === Department::CODE_IMC
+                || $user->hasRole('admin');
 
             if ($request->ajax()) {
-                $itemLocations = $this->itemLocationService->getAll();
-
-                if (! $isImc) {
-                    // Staff melihat stok MILIKNYA, di gudang manapun —
-                    // termasuk yang masih dititipkan di IMC.
-                    $itemLocations->where('demander_id', $user->department_id);
-                }
-
-                if ($request->item_id) {
-                    $itemLocations->where('item_id', $request->item_id);
-                }
-                if ($request->warehouse_id) {
-                    $itemLocations->where('warehouse_id', $request->warehouse_id);
-                }
-                if ($request->demander_id) {
-                    $itemLocations->where('demander_id', $request->demander_id);
-                }
-
-                return DataTables::of($itemLocations)
-                    ->addIndexColumn()
-                    ->addColumn('item', fn($row) => $row->item->item_no . ' - ' . $row->item->item_desc)
-                    ->addColumn('warehouse', fn($row) => $row->warehouse->name . ' - ' . $row->warehouse->tag)
-                    ->addColumn('demander', fn($row) => $row->demander->code ?? '-')
-                    ->addColumn('receiving_lot', fn($row) => $row->receiving_lot ?? '-')
-                    ->addColumn('exp_date', fn($row) => $row->exp_date ? $row->exp_date->format('M Y') : '-')
-                    ->addColumn('package', function ($row) {
-                        // qty_package tidak di-update saat CONS — yang benar
-                        // adalah hasil bagi berat, lewat accessor.
-                        return number_format($row->qty_package_display, 2, ',', '.') . ' ' .
-                            ($row->package ?? 'pkg') .
-                            '<br><small class="text-muted">@ ' .
-                            number_format((float) $row->qty_perpackage, 2, ',', '.') . ' kg</small>';
-                    })
-                    ->addColumn('qty_weight', fn($row) => number_format((float) $row->qty_weight, 2, ',', '.') . ' ' . $row->item->item_uom)
-                    ->addColumn('action', function ($row) {
-                        $btns = '';
-
-                        if (auth()->user()->can('item-locations.update')) {
-                            $btns .= '<a href="' . route('item-locations.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
-                        }
-
-                        if (auth()->user()->can('item-locations.dispose') && (float) $row->qty_weight > 0) {
-                            $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-dispose"
-                                data-id="' . $row->id . '"
-                                data-name="' . e($row->receiving_lot ?? $row->item->item_desc) . '"
-                                data-qty="' . number_format((float) $row->qty_weight, 2, ',', '.') . '">Buang</button>';
-                        }
-
-                        return $btns ?: '<span class="text-muted">-</span>';
-                    })
-                    ->rawColumns(['package', 'action'])
-                    ->make(true);
+                return $isImc
+                    ? $this->lotTable($request)
+                    : $this->summaryTable($user);
             }
 
             $items = $this->itemService->getAll()->get();
 
-            $warehouses = $isImc
-                ? $this->warehouseService->getAll()->get()
-                : collect();
-
-            $departments = $isImc
-                ? $this->departmentService->getAll()->get()
-                : collect();
+            $warehouses = $isImc ? $this->warehouseService->getAll()->get() : collect();
+            $departments = $isImc ? $this->departmentService->getAll()->get() : collect();
 
             return view('pages.item_locations.index', compact('items', 'warehouses', 'departments', 'isImc'));
         } catch (\Exception $e) {
@@ -118,6 +67,105 @@ class ItemLocationController extends Controller
 
             return redirect()->back()->with('error', 'Data stok gudang tidak dapat ditampilkan.');
         }
+    }
+
+    /**
+     * Rincian per lot — untuk IMC & admin yang mengelola gudang.
+     */
+    private function lotTable(Request $request)
+    {
+        $itemLocations = $this->itemLocationService->getAll();
+
+        if ($request->item_id) {
+            $itemLocations->where('item_id', $request->item_id);
+        }
+        if ($request->warehouse_id) {
+            $itemLocations->where('warehouse_id', $request->warehouse_id);
+        }
+        if ($request->demander_id) {
+            $itemLocations->where('demander_id', $request->demander_id);
+        }
+
+        return DataTables::of($itemLocations)
+            ->addIndexColumn()
+            ->addColumn('item', fn($row) => $row->item->item_no . ' - ' . $row->item->item_desc)
+            ->addColumn('warehouse', fn($row) => $row->warehouse->name . ' - ' . $row->warehouse->tag)
+            ->addColumn('demander', fn($row) => $row->demander->code ?? '-')
+            ->addColumn('receiving_lot', fn($row) => $row->receiving_lot ?? '-')
+            ->addColumn('exp_date', fn($row) => $row->exp_date ? $row->exp_date->format('M Y') : '-')
+            ->addColumn('package', function ($row) {
+                // qty_package tidak di-update saat CONS — yang benar
+                // adalah hasil bagi berat, lewat accessor.
+                return number_format($row->qty_package_display, 2, ',', '.') . ' ' .
+                    ($row->package ?? 'pkg') .
+                    '<br><small class="text-muted">@ ' .
+                    number_format((float) $row->qty_perpackage, 2, ',', '.') . ' kg</small>';
+            })
+            ->addColumn('qty_weight', fn($row) => number_format((float) $row->qty_weight, 2, ',', '.') . ' ' . $row->item->item_uom)
+            ->addColumn('action', function ($row) {
+                $btns = '';
+
+                if (auth()->user()->can('item-locations.update')) {
+                    $btns .= '<a href="' . route('item-locations.edit', $row->id) . '" class="btn btn-sm btn-warning">Edit</a>';
+                }
+
+                if (auth()->user()->can('item-locations.dispose') && (float) $row->qty_weight > 0) {
+                    $btns .= ' <button type="button" class="btn btn-sm btn-danger btn-dispose"
+                        data-id="' . $row->id . '"
+                        data-name="' . e($row->receiving_lot ?? $row->item->item_desc) . '"
+                        data-qty="' . number_format((float) $row->qty_weight, 2, ',', '.') . '">Buang</button>';
+                }
+
+                return $btns ?: '<span class="text-muted">-</span>';
+            })
+            ->rawColumns(['package', 'action'])
+            ->make(true);
+    }
+
+    /**
+     * Rekap per item — untuk staff. Memisahkan stok yang sudah ada
+     * di gudang sendiri dari yang masih dititipkan di IMC, supaya
+     * staff tahu kapan perlu membuat transfer request.
+     */
+    private function summaryTable($user)
+    {
+        $imcWarehouseIds = $this->warehouseService->getIdsByDepartmentCode(Department::CODE_IMC);
+
+        $rows = $this->itemLocationService->getDemanderStockSummary(
+            (int) $user->department_id,
+            $imcWarehouseIds
+        );
+
+        return DataTables::of($rows)
+            ->addIndexColumn()
+            ->addColumn('item', fn($row) => '<strong>' . e($row->item_no) . '</strong><br>'
+                . '<small class="text-muted">' . e($row->item_desc) . '</small>')
+            ->addColumn('imc_stock', fn($row) => number_format($row->imc_stock, 2, ',', '.') . ' ' . $row->item_uom)
+            ->addColumn('local_stock', function ($row) {
+                $text = number_format($row->local_stock, 2, ',', '.') . ' ' . $row->item_uom;
+
+                // Stok di gudang habis padahal masih ada titipan di IMC
+                // — pertanda perlu segera membuat transfer request.
+                if ($row->local_stock <= 0 && $row->imc_stock > 0) {
+                    return '<span class="text-danger">' . $text . '</span>';
+                }
+
+                return $text;
+            })
+            ->addColumn('total_stock', function ($row) {
+                $text = '<strong>' . number_format($row->total_stock, 2, ',', '.') . ' ' . $row->item_uom . '</strong>';
+
+                if ($row->min_stock !== null && $row->total_stock < $row->min_stock) {
+                    return $text . '<br><span class="badge badge-warning">Di bawah minimum</span>';
+                }
+
+                return $text;
+            })
+            ->addColumn('min_stock', fn($row) => $row->min_stock !== null
+                ? number_format($row->min_stock, 2, ',', '.')
+                : '<span class="text-muted">-</span>')
+            ->rawColumns(['item', 'local_stock', 'total_stock', 'min_stock'])
+            ->make(true);
     }
 
 

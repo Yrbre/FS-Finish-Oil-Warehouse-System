@@ -28,4 +28,10 @@ interface TransferRequestRepositoryInterface
 
     /** Versi dengan row lock — cegah dua approver memproses bersamaan. */
     public function getByIdForUpdate(int $id);
+
+    /**
+     * Rekap transfer yang sudah SELESAI (received) dalam rentang
+     * tanggal, untuk widget dashboard IMC.
+     */
+    public function getReceivedSummary(string $from, string $to): array;
 }

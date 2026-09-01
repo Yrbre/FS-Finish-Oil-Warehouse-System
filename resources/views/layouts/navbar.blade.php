@@ -52,13 +52,7 @@
                     </li>
                 @endcanany
 
-                @can('items.view')
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('items.index') }}">
-                            <span class="ml-lg-2">Item Oil</span>
-                        </a>
-                    </li>
-                @endcan
+
 
                 {{-- Transaksi --}}
                 @canany(['transactions.porc.view', 'transactions.cons.view', 'transactions.adj.view',
@@ -94,8 +88,8 @@
                         </a>
                         <div class="dropdown-menu" aria-labelledby="inventoryDropdown">
                             @can('item-locations.view')
-                                <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span
-                                        class="ml-1">Item Onhand</span></a>
+                                <a class="nav-link pl-lg-2" href="{{ route('item-locations.index') }}"><span class="ml-1">Item
+                                        Onhand</span></a>
                             @endcan
                             @can('relocations.view')
                                 <a class="nav-link pl-lg-2" href="{{ route('relocations.index') }}"><span class="ml-1">Pindah
@@ -104,6 +98,15 @@
                         </div>
                     </li>
                 @endcanany
+
+                {{-- Item Oil --}}
+                @can('items.view')
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('items.index') }}">
+                            <span class="ml-lg-2">Item Oil</span>
+                        </a>
+                    </li>
+                @endcan
 
                 {{-- Laporan --}}
                 @can('reports.view')

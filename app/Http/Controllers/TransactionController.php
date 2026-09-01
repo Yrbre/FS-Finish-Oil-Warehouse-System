@@ -45,6 +45,8 @@ class TransactionController extends Controller
     public function index(Request $request)
     {
         try {
+            $user = auth()->user();
+            $seeAll = $user->hasRole('admin') || $user->hasRole('imc');
             // Peta permission "view" → doc_type yang diwakilinya
             $viewMap = [
                 'transactions.porc.view' => Transaction::DOC_PORC,
@@ -64,6 +66,11 @@ class TransactionController extends Controller
             if ($request->ajax()) {
                 $transactions = $this->transactionService->getAll()
                     ->whereIn('doc_type', $allowedDocTypes);
+
+                // Transaksi milik department lain tidak boleh terlihat.
+                if (! $seeAll) {
+                    $transactions->where('demander_id', $user->department_id);
+                }
 
                 // Kalau user filter jenis tertentu, pastikan jenis itu tetap
                 // dalam batas yang dia boleh lihat (cegah bypass lewat query string)
