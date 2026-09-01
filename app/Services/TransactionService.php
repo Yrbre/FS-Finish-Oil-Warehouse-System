@@ -94,7 +94,11 @@ class TransactionService implements TransactionServiceInterface
 
         [$inQty, $outQty] = $this->resolveDirection($data, $transQty);
 
-        if ($outQty > $bbQty) {
+        // ADJ mengoreksi SATU lot, bukan gudang — memvalidasi terhadap
+        // total gudang menghasilkan pesan yang menyesatkan. Validasi
+        // yang tepat ada di applyStockMovement(), terhadap lot yang
+        // benar-benar dipilih.
+        if ($data['doc_type'] !== Transaction::DOC_ADJ && $outQty > $bbQty) {
             throw new \Exception(
                 "Stok tidak mencukupi untuk item {$item->item_no}. Stok tersedia: " .
                     number_format($bbQty, 2, ',', '.') . " kg, dibutuhkan: " .

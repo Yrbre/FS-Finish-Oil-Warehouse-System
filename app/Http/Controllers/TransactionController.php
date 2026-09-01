@@ -251,8 +251,16 @@ class TransactionController extends Controller
      ===================================================================== */
     public function createAdj()
     {
-        $items      = $this->itemService->getAll()->get();
-        $warehouses = $this->warehouseService->getAll()->get();
+        $items = $this->itemService->getAll()->get();
+
+        // ADJ hanya sah di gudang department — sama seperti CONS.
+        $warehouses = $this->warehouseService->getAll()
+            ->whereHas('department', fn($q) => $q->where('code', '!=', \App\Models\Department::CODE_IMC))
+            ->when(
+                ! auth()->user()->hasRole('admin'),
+                fn($q) => $q->where('department_id', auth()->user()->department_id)
+            )
+            ->get();
 
         return view('pages.transactions.adj', compact('items', 'warehouses'));
     }
@@ -262,6 +270,11 @@ class TransactionController extends Controller
         try {
             $data = $request->validated();
             $data['doc_type'] = Transaction::DOC_ADJ;
+            $data['demander_id'] = auth()->user()->department_id;
+
+            if (! $data['demander_id']) {
+                throw new \Exception("Akun Anda belum terdaftar di department manapun.");
+            }
 
             $this->transactionService->create($data, auth()->id());
 
