@@ -88,12 +88,22 @@
                                     </tr>
                                 </thead>
                                 <tbody>
+
                                     @forelse ($recentTransactions as $trx)
+                                        @php
+                                            $doctypes = match ($trx->doc_type) {
+                                                'PORC' => 'badge-success',
+                                                'CONS' => 'badge-warning',
+                                                'ADJ' => 'badge-info',
+                                                default => 'badge-secondary',
+                                            };
+                                        @endphp
                                         <tr>
                                             <td>{{ \Carbon\Carbon::parse($trx->trans_date)->format('d-m-Y') }}</td>
-                                            <td><span class="badge badge-light">{{ $trx->doc_type }}</span></td>
+                                            <td><span class="badge {{ $doctypes }}">{{ $trx->doc_type }}</span></td>
                                             <td>{{ $trx->item_desc }}</td>
-                                            <td>{{ $trx->warehouse->name ?? '-' }}</td>
+                                            <td>{{ $trx->warehouse->name ?? '-' }} - {{ $trx->warehouse->tag ?? '-' }}
+                                            </td>
                                         </tr>
                                     @empty
                                         <tr>

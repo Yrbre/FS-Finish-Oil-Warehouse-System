@@ -12,11 +12,12 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Sekali sehari pagi hari — cukup untuk peringatan stok,
-        // dan tidak membanjiri kotak masuk.
         $schedule->command('stock:check-alerts')
-            ->dailyAt('07:00')
-            ->withoutOverlapping();
+            ->everyMinute()
+            ->withoutOverlapping()
+            // Tanpa ini output dibuang ke NUL dan penyebab
+            // kegagalan tidak terlihat sama sekali.
+            ->appendOutputTo(storage_path('logs/stock-alerts.log'));
     }
 
     /**

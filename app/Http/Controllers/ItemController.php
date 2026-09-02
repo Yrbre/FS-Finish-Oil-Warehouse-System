@@ -59,19 +59,20 @@ class ItemController extends Controller
                 } else {
                     $demanderId = (int) $user->department_id;
 
-                    $items->withSum(
-                        ['itemLocations as imc_stock' => fn($q) => $q
-                            ->whereNull('disposed_at')->where('qty_weight', '>', 0)
-                            ->where('demander_id', $demanderId)
-                            ->whereIn('warehouse_id', $imcIds)],
-                        'qty_weight'
-                    )->withSum(
-                        ['itemLocations as local_stock' => fn($q) => $q
-                            ->whereNull('disposed_at')->where('qty_weight', '>', 0)
-                            ->where('demander_id', $demanderId)
-                            ->whereNotIn('warehouse_id', $imcIds)],
-                        'qty_weight'
-                    );
+                    $items->with('minimumStocks')
+                        ->withSum(
+                            ['itemLocations as imc_stock' => fn($q) => $q
+                                ->whereNull('disposed_at')->where('qty_weight', '>', 0)
+                                ->where('demander_id', $demanderId)
+                                ->whereIn('warehouse_id', $imcIds)],
+                            'qty_weight'
+                        )->withSum(
+                            ['itemLocations as local_stock' => fn($q) => $q
+                                ->whereNull('disposed_at')->where('qty_weight', '>', 0)
+                                ->where('demander_id', $demanderId)
+                                ->whereNotIn('warehouse_id', $imcIds)],
+                            'qty_weight'
+                        );
                 }
 
                 $dt = DataTables::of($items)->addIndexColumn();
@@ -91,11 +92,15 @@ class ItemController extends Controller
                             ? '<span class="text-danger">' . $text . '</span>'
                             : $text;
                     })
-                        ->addColumn('total_stock', function ($row) {
+                        ->addColumn('total_stock', function ($row) use ($user) {
                             $total = (float) ($row->imc_stock ?? 0) + (float) ($row->local_stock ?? 0);
                             $text  = '<strong>' . number_format($total, 2, ',', '.') . ' ' . $row->item_uom . '</strong>';
 
-                            if ($row->min_stock !== null && $total < (float) $row->min_stock) {
+                            // Ambang diambil dari minimum_stocks per
+                            // department, bukan lagi kolom di items.
+                            $min = $row->minStockFor((int) $user->department_id);
+
+                            if ($min !== null && $total < $min) {
                                 return $text . '<br><span class="badge badge-warning">Di bawah minimum</span>';
                             }
 
@@ -194,11 +199,11 @@ class ItemController extends Controller
     /**
      * Kartu stok bulanan.
      *
-     * - User dengan permission 'manage-items' (admin/IMC): kartu lengkap,
-     *   bisa pilih department & warehouse manapun, semua jenis transaksi.
-     * - User lain yang cuma punya 'create-transaction' (staff): otomatis
-     *   ter-scope ke department dia sendiri, HANYA menghitung Transfer-in,
-     *   CONS, dan ADJ (PORC & Transfer-out diabaikan).
+     * - Punya 'item-locations.view' (admin/IMC): kartu lengkap, bisa
+     *   pilih department & warehouse manapun, semua jenis transaksi.
+     * - Staff: ter-scope ke department sendiri, hanya menghitung
+     *   TRANSFER_IN, CONS, dan ADJ — PORC & TRANSFER_OUT diabaikan
+     *   karena itu urusan gudang IMC.
      */
     public function detail(string $id, Request $request)
     {
@@ -298,27 +303,5 @@ class ItemController extends Controller
 
             return redirect()->route('items.index')->with('error', 'Kartu stok tidak dapat ditampilkan: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * AJAX: total stok item di gudang tertentu.
-     */
-    public function getStock(Request $request)
-    {
-        $request->validate([
-            'item_id'      => ['required', 'exists:items,id'],
-            'warehouse_id' => ['required', 'exists:warehouses,id'],
-        ]);
-
-        $item  = $this->itemService->getById((int) $request->item_id);
-        $stock = $this->itemLocationService->getTotalStock(
-            (int) $request->item_id,
-            (int) $request->warehouse_id
-        );
-
-        return response()->json([
-            'stock' => $stock,
-            'uom'   => $item->item_uom,
-        ]);
     }
 }

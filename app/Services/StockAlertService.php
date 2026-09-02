@@ -26,10 +26,7 @@ class StockAlertService
         // Item dipantau kalau punya min_stock global ATAU punya
         // pengaturan khusus per department.
         $items = Item::with('minimumStocks')
-            ->where(function ($q) {
-                $q->where('min_stock', '>', 0)
-                    ->orWhereHas('minimumStocks', fn($q2) => $q2->where('is_active', true));
-            })
+            ->whereHas('minimumStocks', fn($q) => $q->where('is_active', true))
             ->get();
 
         if ($items->isEmpty()) {

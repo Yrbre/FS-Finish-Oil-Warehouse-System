@@ -39,7 +39,7 @@ class DashboardController extends Controller
         // Admin & IMC memantau seluruh department. Staff hanya
         // melihat yang menjadi miliknya — angka gabungan tidak
         // bermakna baginya, dan bukan haknya.
-        $seeAll     = $user->hasRole('admin') || $user->hasRole('imc');
+        $seeAll     = $user->hasRole('admin');
         $demanderId = $seeAll ? null : $user->department_id;
 
         $summary = (object) [
@@ -69,7 +69,7 @@ class DashboardController extends Controller
             ->when($demanderId, fn($q) => $q->where('demander_id', $demanderId))
             ->latest('trans_date')
             ->latest('id')
-            ->take(6)
+            ->take(5)
             ->get();
 
         $nearExpiry = $this->itemLocationService->getNearExpiring(30, 6, $demanderId);

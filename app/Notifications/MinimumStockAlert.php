@@ -43,13 +43,13 @@ class MinimumStockAlert extends Notification
             'item_no'       => $this->item->item_no,
             'item_desc'     => $this->item->item_desc,
             'department'    => $this->department->code,
-            'min_stock'     => (float) $this->item->min_stock,
+            'min_stock'     => $this->minStock,
             'current_stock' => $this->currentStock,
             'local_stock'   => $this->localStock,
             'title'         => 'Stok di bawah minimum',
-            'message'       => "{$this->item->item_no} tersisa " .
+            'message'       => "{$this->item->item_no} - {$this->item->item_desc} tersisa " .
                 number_format($this->currentStock, 2, ',', '.') . " kg, di bawah minimum " .
-                number_format((float) $this->item->min_stock, 2, ',', '.') . " kg.",
+                number_format($this->minStock, 2, ',', '.') . " kg.",
             'url'           => route('items.detail', $this->item->id),
         ];
     }
@@ -62,7 +62,7 @@ class MinimumStockAlert extends Notification
             ->subject("[Finish Oil] Stok Minimum — {$this->item->item_no}")
             ->greeting("Halo {$notifiable->name},")
             ->line("Stok **{$this->item->item_no} — {$this->item->item_desc}** milik department {$this->department->code} sudah di bawah ambang minimum.")
-            ->line('Minimum: ' . number_format((float) $this->item->min_stock, 2, ',', '.') . ' kg')
+            ->line('Minimum: ' . number_format($this->minStock, 2, ',', '.') . ' kg')
             ->line('Total saat ini: ' . number_format($this->currentStock, 2, ',', '.') . ' kg')
             ->line('Di gudang sendiri: ' . number_format($this->localStock, 2, ',', '.') . ' kg')
             ->line('Masih di gudang IMC: ' . number_format($inTransit, 2, ',', '.') . ' kg')
