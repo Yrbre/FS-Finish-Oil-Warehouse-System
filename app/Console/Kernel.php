@@ -13,7 +13,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('stock:check-alerts')
-            ->everyMinute()
+            ->dailyAt('08:00')
             ->withoutOverlapping()
             // Tanpa ini output dibuang ke NUL dan penyebab
             // kegagalan tidak terlihat sama sekali.
