@@ -41,6 +41,8 @@ class PorcUpdateRequest extends FormRequest
             // memvalidasi ulang, jangan percaya form saja.
             'qty_perpackage'  => ['nullable', 'numeric', 'gt:0', 'decimal:0,4'],
             'qty_package'     => ['nullable', 'integer', 'gt:0'],
+            'doc_coa'         => ['required', 'file', 'mimes:pdf', 'max:2048'],
+            'po_number'        => ['required', 'string', 'max:50'],
         ];
     }
 
@@ -51,6 +53,10 @@ class PorcUpdateRequest extends FormRequest
             'edit_reason.min'       => 'Alasan perubahan terlalu singkat, jelaskan lebih detail.',
             'qty_package.integer'   => 'Jumlah kemasan harus bilangan bulat — kemasan di IMC tidak boleh terbuka.',
             'qty_perpackage.gt'     => 'Ukuran per kemasan harus lebih besar dari 0.',
+            'doc_coa.mimes'          => 'File DOC COA harus berupa PDF.',
+            'doc_coa.max'            => 'File DOC COA maksimal 2 MB.',
+            'po_number.required'     => 'Nomor PO wajib diisi.',
+            'po_number.max'          => 'Nomor PO maksimal 50 karakter.',
         ];
     }
 
@@ -63,6 +69,8 @@ class PorcUpdateRequest extends FormRequest
             'package'         => 'Jenis Kemasan',
             'qty_perpackage'  => 'Isi per Kemasan',
             'qty_package'     => 'Jumlah Kemasan',
+            'doc_coa'         => 'File DOC COA',
+            'po_number'       => 'Nomor PO',
         ];
     }
 }

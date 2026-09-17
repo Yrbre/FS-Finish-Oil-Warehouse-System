@@ -28,6 +28,8 @@ class Transaction extends Model
         'demander_id',
         'item_location_id',
         'doc_type',
+        'po_number',
+        'doc_coa',
         'adj_type',
         'trans_date',
         'trans_qty',

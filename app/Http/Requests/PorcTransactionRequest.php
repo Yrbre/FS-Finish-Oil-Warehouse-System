@@ -48,6 +48,8 @@ class PorcTransactionRequest extends FormRequest
             'entries.*.production_date' => ['required', 'date'],
             'entries.*.package'         => ['required', 'string', 'max:50'],
             'entries.*.notes'           => ['nullable', 'string'],
+            'entries.*.doc_coa'         => ['required', 'file', 'mimes:pdf', 'max:2048'],
+            'entries.*.po_number'       => ['required', 'string', 'max:50'],
         ];
     }
 
@@ -65,6 +67,11 @@ class PorcTransactionRequest extends FormRequest
             'entries.*.qty_package.gt'           => 'Jumlah kemasan harus lebih besar dari 0.',
             'entries.*.vendor_lot.required'      => 'Vendor lot wajib diisi.',
             'entries.*.production_date.required' => 'Bulan produksi wajib diisi.',
+            'entries.*.doc_coa.required'         => 'DOC COA wajib diunggah.',
+            'entries.*.doc_coa.mimes'            => 'DOC COA harus berupa file PDF.',
+            'entries.*.doc_coa.max'              => 'DOC COA maksimal 2 MB.',
+            'entries.*.po_number.required'       => 'Nomor PO wajib diisi.',
+            'entries.*.po_number.max'            => 'Nomor PO maksimal 50 karakter.',
         ];
     }
 
@@ -83,6 +90,8 @@ class PorcTransactionRequest extends FormRequest
             $attributes["entries.$i.qty_perpackage"] = "Ukuran per Kemasan (Form #$formNo)";
             $attributes["entries.$i.qty_package"]    = "Jumlah Kemasan (Form #$formNo)";
             $attributes["entries.$i.package"]        = "Jenis Kemasan (Form #$formNo)";
+            $attributes["entries.$i.doc_coa"]        = "DOC COA (Form #$formNo)";
+            $attributes["entries.$i.po_number"]      = "Nomor PO (Form #$formNo)";
         }
 
         return $attributes;

@@ -26,7 +26,8 @@
                 </div>
             @endif
 
-            <form action="{{ route('transactions.porc.store') }}" method="POST" id="porcForm">
+            <form action="{{ route('transactions.porc.store') }}" method="POST" id="porcForm"
+                enctype="multipart/form-data">
                 @csrf
 
                 <div id="entryList"></div>
@@ -58,6 +59,21 @@
             </div>
             <div class="card-body">
 
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label>PO Number <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="entries__INDEX__po_number"
+                            name="entries[__INDEX__][po_number]" required placeholder="Contoh: PO-202601-001">
+                    </div>
+
+                    <div class="form-group col-md-6">
+                        <label>Vendor Lot <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control uppercase" name="entries[__INDEX__][vendor_lot]"
+                            placeholder="Contoh: VENLOT-202601" required>
+                    </div>
+
+
+                </div>
                 <div class="form-row">
                     <div class="form-group col-md-6">
                         <label>Item <span class="text-danger">*</span></label>
@@ -103,23 +119,19 @@
 
                 <div class="form-row">
                     <div class="form-group col-md-6">
-                        <label>Vendor Lot <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control uppercase" name="entries[__INDEX__][vendor_lot]"
-                            placeholder="Contoh: VENLOT-202601" required>
-                    </div>
-
-                    <div class="form-group col-md-6">
                         <label>Bulan Produksi <span class="text-danger">*</span></label>
                         <input type="month" class="form-control row-production-date"
                             name="entries[__INDEX__][production_date]" required>
                     </div>
-                </div>
 
-                <div class="form-row">
-                    <div class="form-group col-md-3">
+                    <div class="form-group col-md-6">
                         <label>Expired <small class="text-muted">(otomatis +1 tahun)</small></label>
                         <input type="text" class="form-control row-exp-preview" readonly placeholder="Terisi otomatis">
                     </div>
+                </div>
+
+                <div class="form-row">
+
 
                     <div class="form-group col-md-3">
                         <label>Jenis Kemasan <span class="text-danger">*</span></label>
@@ -144,13 +156,19 @@
                         <input type="number" step="1" min="1" class="form-control row-package"
                             name="entries[__INDEX__][qty_package]" placeholder="Contoh: 5" required>
                     </div>
-                </div>
 
-                <div class="form-row">
-                    <div class="form-group col-md-6">
+                    <div class="form-group col-md-3">
                         <label>Total Berat <small class="text-muted">(dihitung otomatis)</small></label>
                         <input type="text" class="form-control row-total-weight bg-light font-weight-bold" readonly
                             placeholder="0,00 KG">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-2">
+                        <label>DOC COA <span class="text-danger">* MAX 2 MB</span></label>
+                        <input type="file" class="form-control-file" id="entries__INDEX__doc_coa"
+                            name="entries[__INDEX__][doc_coa]" required>
                     </div>
                 </div>
 

@@ -76,11 +76,13 @@
                                         <th>No</th>
                                         <th>Tanggal</th>
                                         <th>Jenis</th>
+                                        <th>No. PO</th>
                                         <th>Item</th>
                                         <th>Gudang</th>
                                         <th>Masuk</th>
                                         <th>Keluar</th>
                                         <th>Oleh</th>
+                                        <th>COA</th>
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>
@@ -129,6 +131,10 @@
                         name: 'doc_type'
                     },
                     {
+                        data: 'po_number',
+                        name: 'po_number'
+                    },
+                    {
                         data: 'item',
                         name: 'item',
                         orderable: false
@@ -150,6 +156,12 @@
                         data: 'created_by',
                         name: 'created_by',
                         orderable: false
+                    },
+                    {
+                        data: 'coa',
+                        name: 'coa',
+                        orderable: false,
+                        searchable: false
                     },
                     {
                         data: 'action',

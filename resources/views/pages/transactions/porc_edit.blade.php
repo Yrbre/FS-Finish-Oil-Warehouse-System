@@ -52,7 +52,8 @@
                     </span>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('transactions.porc.update', $transaction->id) }}" method="POST">
+                    <form action="{{ route('transactions.porc.update', $transaction->id) }}" method="POST"
+                        enctype="multipart/form-data">
                         @csrf
                         @method('PUT')
 
@@ -82,10 +83,19 @@
 
                         <div class="form-row">
                             <div class="form-group col-md-6">
+                                <label>PO Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="po_number" required
+                                    placeholder="Contoh: PO-202601-001"
+                                    value="{{ old('po_number', $transaction->po_number) }}">
+                            </div>
+                            <div class="form-group col-md-6">
                                 <label>Vendor Lot <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control uppercase" name="vendor_lot"
                                     value="{{ old('vendor_lot', $transaction->vendor_lot) }}" required>
                             </div>
+                        </div>
+
+                        <div class="form-row">
 
                             <div class="form-group col-md-6">
                                 <label>Bulan Produksi <span class="text-danger">*</span></label>
@@ -93,15 +103,14 @@
                                     value="{{ old('production_date', $transaction->production_date?->format('Y-m')) }}"
                                     required>
                             </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-6">
                                 <label>Expired <small class="text-muted">(otomatis +1 tahun)</small></label>
                                 <input type="text" class="form-control" id="expPreview" readonly>
                             </div>
+                        </div>
 
-                            <div class="form-group col-md-4">
+                        <div class="form-row">
+                            <div class="form-group col-md-3">
                                 <label>Jenis Kemasan <span class="text-danger">*</span></label>
                                 <select class="form-control" name="package" required>
                                     @foreach (['BAG', 'CAN', 'DRUM', 'TOTE'] as $pkg)
@@ -112,10 +121,7 @@
                                     @endforeach
                                 </select>
                             </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-3">
                                 <label>Isi per Kemasan (KG) @unless ($isTouched)
                                         <span class="text-danger">*</span>
                                     @endunless
@@ -126,7 +132,7 @@
                                     {{ $isTouched ? 'disabled' : 'required' }}>
                             </div>
 
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-3">
                                 <label>Jumlah Kemasan @unless ($isTouched)
                                         <span class="text-danger">*</span>
                                     @endunless
@@ -136,7 +142,7 @@
                                     {{ $isTouched ? 'disabled' : 'required' }}>
                             </div>
 
-                            <div class="form-group col-md-4">
+                            <div class="form-group col-md-3">
                                 <label>Total Berat</label>
                                 <input type="text" class="form-control bg-light font-weight-bold" id="totalWeight"
                                     readonly>
@@ -154,6 +160,32 @@
                             <label>Catatan</label>
                             <textarea class="form-control" name="notes" rows="2">{{ old('notes', $transaction->notes) }}</textarea>
                         </div>
+                        <div class="form-row">
+                            <div class="form-group col-md-2">
+                                <label>DOC COA <span class="text-danger">* MAX 2 MB</span></label>
+                                <input type="file" class="form-control-file" name="doc_coa" required>
+                            </div>
+
+                        </div>
+                        @if (!$transaction->doc_coa)
+                            <div class="alert alert-warning">
+                                <small class="text-muted">
+                                    Dokumen COA belum di Upload.
+                                </small>
+                            </div>
+                        @else
+                            <div class="form-group">
+                                <label>DOC COA Saat Ini :</label>
+                                <div>
+                                    <a href="{{ asset('storage/' . $transaction->doc_coa) }}" target="_blank"
+                                        class="btn btn-sm btn-outline-primary">
+                                        <span class="fe fe-eye fe-16 mr-2"></span>Tampilkan
+                                    </a>
+                                </div>
+                            </div>
+                        @endif
+
+
 
                         @if ($transaction->isEdited())
                             <div class="alert alert-light border">

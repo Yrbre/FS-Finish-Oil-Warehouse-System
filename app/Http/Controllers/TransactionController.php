@@ -93,6 +93,18 @@ class TransactionController extends Controller
                     ->addColumn('in_qty', fn($row) => (float) $row->in_qty > 0 ? number_format((float) $row->in_qty, 2, ',', '.') : '-')
                     ->addColumn('out_qty', fn($row) => (float) $row->out_qty > 0 ? number_format((float) $row->out_qty, 2, ',', '.') : '-')
                     ->addColumn('created_by', fn($row) => $row->creator->name ?? '-')
+                    ->addColumn('coa', function ($row) {
+                        if ($row->doc_type !== Transaction::DOC_PORC) {
+                            return '<span class="text-muted">-</span>';
+                        }
+
+                        if ($row->doc_coa) {
+                            $url = asset('storage/' . $row->doc_coa);
+                            return '<a href="' . $url . '" target="_blank" class="btn btn-sm btn-info">Lihat</a>';
+                        }
+
+                        return '<span class="text-muted">-</span>';
+                    })
                     ->addColumn('action', function ($row) {
                         if ($row->doc_type !== Transaction::DOC_PORC) {
                             return '<span class="text-muted">-</span>';
@@ -112,7 +124,7 @@ class TransactionController extends Controller
 
                         return $btns ?: '<span class="text-muted">-</span>';
                     })
-                    ->rawColumns(['action'])
+                    ->rawColumns(['action', 'coa'])
                     ->make(true);
             }
 

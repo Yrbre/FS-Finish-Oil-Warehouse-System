@@ -14,7 +14,10 @@ use App\Services\Interfaces\ItemLocationServiceInterface;
 use App\Services\Interfaces\StockLedgerServiceInterface;
 use App\Services\Interfaces\TransactionServiceInterface;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class TransactionService implements TransactionServiceInterface
 {
@@ -54,7 +57,10 @@ class TransactionService implements TransactionServiceInterface
 
             foreach ($entries as $i => $entryData) {
                 $entryData['doc_type'] = $entryData['doc_type'] ?? Transaction::DOC_PORC;
-
+                $file = $entryData['doc_coa'] ?? null;
+                $ext = $file->getClientOriginalExtension();
+                $fileName = 'TFCO-COA-' . $entryData['po_number'] . '-' . Carbon::parse($entryData['trans_date'])->format('Ymd') . '-' . Str::random(5) . '.' . $ext;
+                $entryData['doc_coa'] = $file instanceof UploadedFile ? $file->storeAs('doc_coa', $fileName, 'public') : null;
                 try {
                     $transactions[] = $this->persistTransaction($entryData, $createdBy);
                 } catch (\Exception $e) {
@@ -163,94 +169,135 @@ class TransactionService implements TransactionServiceInterface
      */
     public function updatePorc(int $id, array $data, int $editedBy)
     {
-        return DB::transaction(function () use ($id, $data, $editedBy) {
-            $transaction = $this->transactionRepository->getById($id);
+        $oldCoa = null;
+        $newCoa = null;
+        try {
+            $result = DB::transaction(function () use ($id, $data, $editedBy, &$oldCoa, &$newCoa) {
+                $transaction = $this->transactionRepository->getById($id);
 
-            if ($transaction->doc_type !== Transaction::DOC_PORC) {
-                throw new \Exception("Hanya transaksi Supply Oil (PORC) yang dapat diedit.");
-            }
-
-            $lot = $this->findLotOfPorc($transaction);
-
-            $qtyDiubah = isset($data['qty_package']) || isset($data['qty_perpackage']);
-
-            if ($qtyDiubah && $lot->isTouched()) {
-                throw new \Exception(
-                    "Qty tidak dapat diubah karena stok lot ini sudah terpakai " .
-                        number_format($lot->consumed_weight, 2, ',', '.') . " kg. " .
-                        "Gunakan Adjustment untuk mengoreksi selisihnya."
-                );
-            }
-
-            // --- field non-qty, selalu boleh diubah ---
-            $lotUpdate = [];
-            $trxUpdate = [
-                'edited_at'   => now(),
-                'edited_by'   => $editedBy,
-                'edit_reason' => $data['edit_reason'] ?? null,
-            ];
-
-            foreach (['vendor_lot', 'package', 'production_date'] as $field) {
-                if (array_key_exists($field, $data)) {
-                    $lotUpdate[$field] = $data[$field];
-                    $trxUpdate[$field] = $data[$field];
-                }
-            }
-
-            if (array_key_exists('notes', $data)) {
-                $trxUpdate['notes'] = $data['notes'];
-            }
-
-            if (array_key_exists('exp_date', $data)) {
-                $lotUpdate['exp_date'] = $data['exp_date'];
-                $trxUpdate['exp_date'] = $data['exp_date'];
-            }
-
-            // --- qty, hanya kalau lot masih utuh ---
-            if ($qtyDiubah) {
-                $perPackage = (float) ($data['qty_perpackage'] ?? $transaction->qty_perpackage);
-                $package    = (float) ($data['qty_package'] ?? $transaction->qty_package);
-
-                if ($perPackage <= 0 || $package <= 0) {
-                    throw new \Exception("Ukuran dan jumlah package harus lebih dari 0.");
+                if ($transaction->doc_type !== Transaction::DOC_PORC) {
+                    throw new \Exception("Hanya transaksi Supply Oil (PORC) yang dapat diedit.");
                 }
 
-                $newWeight = round($perPackage * $package, 2);
+                $lot = $this->findLotOfPorc($transaction);
 
-                $lotUpdate['qty_perpackage'] = $perPackage;
-                $lotUpdate['qty_package']    = $package;
-                $lotUpdate['qty_weight']     = $newWeight;
-                // Lot dianggap seolah baru dibuat dengan angka terkoreksi.
-                $lotUpdate['initial_weight'] = $newWeight;
+                $qtyDiubah = isset($data['qty_package']) || isset($data['qty_perpackage']);
 
-                $trxUpdate['qty_perpackage'] = $perPackage;
-                $trxUpdate['qty_package']    = $package;
-                $trxUpdate['trans_qty']      = $newWeight;
-                $trxUpdate['in_qty']         = $newWeight;
-                $trxUpdate['eb_qty']         = round((float) $transaction->bb_qty + $newWeight, 2);
+                if ($qtyDiubah && $lot->isTouched()) {
+                    throw new \Exception(
+                        "Qty tidak dapat diubah karena stok lot ini sudah terpakai " .
+                            number_format($lot->consumed_weight, 2, ',', '.') . " kg. " .
+                            "Gunakan Adjustment untuk mengoreksi selisihnya."
+                    );
+                }
+
+                // --- field non-qty, selalu boleh diubah ---
+                $lotUpdate = [];
+                $trxUpdate = [
+                    'edited_at'   => now(),
+                    'edited_by'   => $editedBy,
+                    'edit_reason' => $data['edit_reason'] ?? null,
+                ];
+
+                foreach (['vendor_lot', 'package', 'production_date'] as $field) {
+                    if (array_key_exists($field, $data)) {
+                        $lotUpdate[$field] = $data[$field];
+                        $trxUpdate[$field] = $data[$field];
+                    }
+                }
+
+                if (array_key_exists('po_number', $data)) {
+                    $trxUpdate['po_number'] = $data['po_number'];
+                }
+
+                $poNumber = $trxUpdate['po_number'] ?? $transaction->po_number;
+
+                $file = $data['doc_coa'] ?? null;
+
+
+                if ($file instanceof UploadedFile) {
+                    $ext      = $file->getClientOriginalExtension();
+                    $fileName = sprintf(
+                        'TFCO-COA-%s-%s-%s.%s',
+                        Str::slug($poNumber),
+                        Carbon::parse($transaction->trans_date)->format('Ymd'),
+                        Str::random(5),
+                        $ext
+                    );
+
+                    $newCoa = $file->storeAs('doc_coa', $fileName, 'public');
+                    $trxUpdate['doc_coa'] = $newCoa;
+                    $oldCoa = $transaction->doc_coa;
+                }
+
+
+                if (array_key_exists('notes', $data)) {
+                    $trxUpdate['notes'] = $data['notes'];
+                }
+
+                if (array_key_exists('exp_date', $data)) {
+                    $lotUpdate['exp_date'] = $data['exp_date'];
+                    $trxUpdate['exp_date'] = $data['exp_date'];
+                }
+
+                // --- qty, hanya kalau lot masih utuh ---
+                if ($qtyDiubah) {
+                    $perPackage = (float) ($data['qty_perpackage'] ?? $transaction->qty_perpackage);
+                    $package    = (float) ($data['qty_package'] ?? $transaction->qty_package);
+
+                    if ($perPackage <= 0 || $package <= 0) {
+                        throw new \Exception("Ukuran dan jumlah package harus lebih dari 0.");
+                    }
+
+                    $newWeight = round($perPackage * $package, 2);
+
+                    $lotUpdate['qty_perpackage'] = $perPackage;
+                    $lotUpdate['qty_package']    = $package;
+                    $lotUpdate['qty_weight']     = $newWeight;
+                    // Lot dianggap seolah baru dibuat dengan angka terkoreksi.
+                    $lotUpdate['initial_weight'] = $newWeight;
+
+                    $trxUpdate['qty_perpackage'] = $perPackage;
+                    $trxUpdate['qty_package']    = $package;
+                    $trxUpdate['trans_qty']      = $newWeight;
+                    $trxUpdate['in_qty']         = $newWeight;
+                    $trxUpdate['eb_qty']         = round((float) $transaction->bb_qty + $newWeight, 2);
+                }
+
+                if (! empty($lotUpdate)) {
+                    $this->itemLocationService->update($lot->id, $lotUpdate);
+                }
+
+                $this->transactionRepository->update($id, $trxUpdate);
+
+                // Ledger diperbarui, bukan ditambah — ini koreksi input,
+                // bukan mutasi baru.
+                if ($qtyDiubah) {
+                    $this->stockLedgerRepository->updateByRef(
+                        StockLedger::REF_TRANSACTION,
+                        $id,
+                        [
+                            'in_qty' => $trxUpdate['in_qty'],
+                            'eb_qty' => $trxUpdate['eb_qty'],
+                        ]
+                    );
+                }
+
+
+                return $this->transactionRepository->getById($id);
+            });
+        } catch (\Throwable $e) {
+            if ($newCoa) {
+                Storage::disk('public')->delete($newCoa);
             }
+            throw $e;
+        }
 
-            if (! empty($lotUpdate)) {
-                $this->itemLocationService->update($lot->id, $lotUpdate);
-            }
+        if ($oldCoa && $oldCoa !== $newCoa) {
+            Storage::disk('public')->delete($oldCoa);
+        }
 
-            $this->transactionRepository->update($id, $trxUpdate);
-
-            // Ledger diperbarui, bukan ditambah — ini koreksi input,
-            // bukan mutasi baru.
-            if ($qtyDiubah) {
-                $this->stockLedgerRepository->updateByRef(
-                    StockLedger::REF_TRANSACTION,
-                    $id,
-                    [
-                        'in_qty' => $trxUpdate['in_qty'],
-                        'eb_qty' => $trxUpdate['eb_qty'],
-                    ]
-                );
-            }
-
-            return $this->transactionRepository->getById($id);
-        });
+        return $result;
     }
 
     /* ================= DELETE ================= */
