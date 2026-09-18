@@ -61,9 +61,6 @@
         $(function() {
             const isImc = @json($isImc);
 
-            // Staff melihat stoknya dipisah antara yang masih di IMC
-            // dan yang sudah di gudang sendiri — supaya tahu kapan
-            // perlu membuat transfer request.
             const stockColumns = isImc ? [{
                 data: 'imc_stock',
                 name: 'imc_stock',

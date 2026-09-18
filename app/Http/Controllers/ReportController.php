@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Department;
+use App\Models\ItemLocation;
 use App\Services\Interfaces\ItemLocationServiceInterface;
 
 class ReportController extends Controller
@@ -12,15 +14,42 @@ class ReportController extends Controller
 
     public function index()
     {
-        $user = auth()->user();
+        $itemSF = ItemLocation::with('item')
+            ->whereHas('warehouse', function ($query) {
+                $idIMC = Department::where('code', 'IMC')->first()->id;
+                $query->where('department_id', $idIMC);
+            })
+            ->whereHas('demander', function ($query) {
+                $query->where('code', 'SF');
+            })
+            ->where('is_warehouse_stock', true)
+            ->where('qty_weight', '>', 0)
+            ->get();
 
-        // Laporan staff dibatasi stok miliknya sendiri.
-        $seeAll     = $user->hasRole('admin') || $user->hasRole('imc');
-        $demanderId = $seeAll ? null : $user->department_id;
+        $itemFY = ItemLocation::with('item')
+            ->whereHas('warehouse', function ($query) {
+                $idIMC = Department::where('code', 'IMC')->first()->id;
+                $query->where('department_id', $idIMC);
+            })
+            ->whereHas('demander', function ($query) {
+                $query->whereIn('code', ['FY1', 'FY2', 'FY3']);
+            })
+            ->where('is_warehouse_stock', true)
+            ->where('qty_weight', '>', 0)
+            ->get();
 
-        $nearExpiry       = $this->itemLocationService->getNearExpiring(30, 50, $demanderId);
-        $stockByWarehouse = $this->itemLocationService->getStockSummaryByWarehouse($demanderId);
+        $itemHSF = ItemLocation::with('item')
+            ->whereHas('warehouse', function ($query) {
+                $idIMC = Department::where('code', 'IMC')->first()->id;
+                $query->where('department_id', $idIMC);
+            })
+            ->whereHas('demander', function ($query) {
+                $query->whereIn('code', ['PBX', 'PCP']);
+            })
+            ->where('is_warehouse_stock', true)
+            ->where('qty_weight', '>', 0)
+            ->get();
 
-        return view('pages.reports.index', compact('nearExpiry', 'stockByWarehouse', 'seeAll'));
+        return view('pages.reports.index', compact('itemSF', 'itemFY', 'itemHSF'));
     }
 }

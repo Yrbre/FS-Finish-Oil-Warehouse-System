@@ -17,7 +17,9 @@
                     <div class="card shadow">
                         <div class="card-body">
                             <p class="small text-muted mb-1 text-uppercase">Total Item</p>
-                            <span class="h3">{{ $summary->total_items }}</span>
+                            <div class="d-flex justify-content-between">
+                                <span class="h3">{{ $summary->total_items }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -25,27 +27,39 @@
                     <div class="card shadow">
                         <div class="card-body">
                             <p class="small text-muted mb-1 text-uppercase">Total Gudang</p>
-                            <span class="h3">{{ $summary->total_warehouses }}</span>
+                            <div class="d-flex justify-content-between">
+                                <span class="h3">{{ $summary->total_warehouses }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-4">
                     <div class="card shadow">
                         <div class="card-body">
-                            {{-- Label berbeda untuk staff: angkanya hanya
-                                 stok miliknya, bukan seluruh department. --}}
                             <p class="small text-muted mb-1 text-uppercase">{{ $summary->stock_label }}</p>
-                            <span class="h3">{{ number_format($summary->total_stock, 0, ',', '.') }}</span>
+                            <div class="d-flex justify-content-between">
+                                <span class="h3">{{ number_format($summary->total_stock, 0, ',', '.') }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
                 @can('transfer-requests.approve')
                     <div class="col-md-3 mb-4">
-                        <div class="card shadow {{ $pendingApproval > 0 ? 'border-warning' : '' }}">
+                        <div
+                            class="card shadow {{ $pendingApproval > 0 || $overDueTransferRequests > 0 ? 'border-warning' : '' }}">
                             <div class="card-body">
-                                <p class="small text-muted mb-1 text-uppercase">Menunggu Approval</p>
-                                <span class="h3 {{ $pendingApproval > 0 ? 'text-warning' : '' }}">{{ $pendingApproval }}</span>
-                                @if ($pendingApproval > 0)
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <p class="small text-muted mb-1 text-uppercase">Menunggu Approval Transfer</p>
+                                    <p class="small text-muted mb-1 text-uppercase">Overdue Transfer</p>
+                                </div>
+
+                                <div class="d-flex justify-content-between">
+                                    <span
+                                        class="h3 {{ $pendingApproval > 0 ? 'text-warning' : '' }}">{{ $pendingApproval }}</span>
+                                    <span
+                                        class="h3 justify-content-end {{ $overDueTransferRequests > 0 ? 'text-danger' : '' }}">{{ $overDueTransferRequests }}</span>
+                                </div>
+                                @if ($pendingApproval > 0 || $overDueTransferRequests > 0)
                                     <a href="{{ route('transfer-requests.index') }}?status=new" class="small d-block">Lihat
                                         semua &raquo;</a>
                                 @endif
@@ -100,7 +114,8 @@
                                         @endphp
                                         <tr>
                                             <td>{{ \Carbon\Carbon::parse($trx->trans_date)->format('d-m-Y') }}</td>
-                                            <td><span class="badge {{ $doctypes }}">{{ $trx->doc_type }}</span></td>
+                                            <td><span class="badge {{ $doctypes }}">{{ $trx->doc_type }}</span>
+                                            </td>
                                             <td>{{ $trx->item_desc }}</td>
                                             <td>{{ $trx->warehouse->name ?? '-' }} - {{ $trx->warehouse->tag ?? '-' }}
                                             </td>

@@ -74,11 +74,20 @@ class DashboardController extends Controller
 
         $nearExpiry = $this->itemLocationService->getNearExpiring(30, 6, $demanderId);
 
+        $overDueTransferRequests = $this->transferRequestService->getAll()
+            ->where('status', TransferRequest::STATUS_APPROVED)
+            ->orWhere('status', TransferRequest::STATUS_IN_TRANSIT)
+            ->orWhere('status', TransferRequest::STATUS_NEW)
+            ->where('expected_date', '<', now())
+            ->count();
+
+
         return view('dashboard', compact(
             'summary',
             'pendingApproval',
             'myOpenRequests',
             'recentTransactions',
+            'overDueTransferRequests',
             'nearExpiry'
         ));
     }

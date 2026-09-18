@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -136,5 +137,34 @@ class ItemLocation extends Model
     public function getConsumedWeightAttribute(): float
     {
         return round((float) $this->initial_weight - (float) $this->qty_weight, 2);
+    }
+
+    /**
+     * Informasi expired.
+     */
+    public function getExpInfoAttribute(): array
+    {
+        if (! $this->exp_date) {
+            return ['text' => '-', 'class' => 'secondary'];
+        }
+
+        $exp   = Carbon::parse($this->exp_date)->startOfDay();
+        $today = Carbon::today();
+
+        $days   = $today->diffInDays($exp, false);
+        $months = $today->diffInMonths($exp, false);
+
+        if ($days < 0) {
+            return ['text' => 'Expired ' . abs($days) . ' hari lalu', 'class' => 'danger'];
+        }
+
+        if ($months < 1) {
+            return ['text' => $days . ' hari lagi', 'class' => 'danger'];
+        }
+
+        return [
+            'text'  => $months . ' bulan lagi',
+            'class' => $months < 3 ? 'warning' : 'success',
+        ];
     }
 }

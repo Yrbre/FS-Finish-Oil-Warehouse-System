@@ -10,113 +10,195 @@
                 </div>
             </div>
 
-            {{-- Ringkasan stok per gudang --}}
-            <div class="row my-4">
-                <div class="col-12">
-                    <div class="card shadow">
-                        <div class="card-header">
-                            <strong class="card-title">Ringkasan Stok per Gudang</strong>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-striped mb-0">
+            {{-- Control LOT CAT FIN --}}
+            <div class="col-md-12 mb-4">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <ul class="nav nav-pills nav-fill mb-3" id="pills-tab" role="tablist">
+                            <li class="nav-item">
+                                <a class="nav-link active" id="pills-FY-tab" data-toggle="pill" href="#pills-FY"
+                                    role="tab" aria-controls="pills-FY" aria-selected="true">FY</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="pills-SF-tab" data-toggle="pill" href="#pills-SF" role="tab"
+                                    aria-controls="pills-SF" aria-selected="false">SF</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="pills-HSF-tab" data-toggle="pill" href="#pills-HSF" role="tab"
+                                    aria-controls="pills-HSF" aria-selected="false">HSF</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="pills-Rekap-tab" data-toggle="pill" href="#pills-Rekap"
+                                    role="tab" aria-controls="pills-Rekap" aria-selected="false">Rekap</a>
+                            </li>
+                        </ul>
+                        <div class="tab-content mb-1" id="pills-tabContent">
+                            <div class="tab-pane fade show active" id="pills-FY" role="tabpanel"
+                                aria-labelledby="pills-FY-tab">
+                                <div class="row align-items-center mb-2">
+                                    <div class="col">
+                                        <h2 class="h5 page-title">Laporan FY (BULAN)</h2>
+                                    </div>
+                                </div>
+                                <table class="table" id="dataTableItem" style="width:100%">
                                     <thead>
                                         <tr>
-                                            <th>Gudang</th>
-                                            <th>Jumlah Jenis Item</th>
-                                            <th class="text-right">Total Stok (KG)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse ($stockByWarehouse as $row)
-                                            <tr>
-                                                <td>{{ $row->warehouse_name }}</td>
-                                                <td>{{ $row->item_count }}</td>
-                                                <td class="text-right">
-                                                    {{ number_format((float) $row->total_stock, 2, ',', '.') }}</td>
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="3" class="text-center text-muted py-3">Belum ada data stok.
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                    @if ($stockByWarehouse->isNotEmpty())
-                                        <tfoot>
-                                            <tr class="font-weight-bold">
-                                                <td colspan="2" class="text-right">Total Keseluruhan</td>
-                                                <td class="text-right">
-                                                    {{ number_format($stockByWarehouse->sum('total_stock'), 2, ',', '.') }}
-                                                </td>
-                                            </tr>
-                                        </tfoot>
-                                    @endif
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Near expiry lengkap --}}
-            <div class="row my-4">
-                <div class="col-12">
-                    <div class="card shadow">
-                        <div class="card-header">
-                            <strong class="card-title">Stok Mendekati Expired (30 hari ke depan)</strong>
-                        </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-striped mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Item</th>
-                                            <th>Gudang</th>
+                                            <th>No</th>
+                                            <th>Nama Item</th>
+                                            <th>Expired(Bulan)</th>
+                                            <th>Berat(KG)</th>
+                                            <th>NO PO</th>
                                             <th>Vendor Lot</th>
-                                            <th>Exp Date</th>
-                                            <th>Sisa Hari</th>
-                                            <th class="text-right">Stok</th>
+                                            <th>Tanggal Produksi</th>
+                                            <th>Expired Date</th>
+                                            <th>Month Overdue</th>
+                                            <th>Jumlah</th>
+                                            <th>Tanggal Penerimaan</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @forelse ($nearExpiry as $lot)
-                                            @php
-                                                $daysLeft = now()->startOfDay()->diffInDays($lot->exp_date, false);
-                                            @endphp
-                                            <tr
-                                                class="{{ $daysLeft < 0 ? 'table-danger' : ($daysLeft <= 7 ? 'table-warning' : '') }}">
-                                                <td>{{ $lot->item->item_desc }}</td>
-                                                <td>{{ $lot->warehouse->name }}</td>
-                                                <td>{{ $lot->vendor_lot ?? '-' }}</td>
-                                                <td>{{ $lot->exp_date->format('d-m-Y') }}</td>
+                                        @forelse ($itemFY as $item)
+                                            <tr>
+                                                <td>{{ $loop->iteration }}</td>
+                                                <td>{{ $item->item->item_desc ?? '-' }}</td>
                                                 <td>
-                                                    @if ($daysLeft < 0)
-                                                        <span class="badge badge-danger">Sudah expired {{ abs($daysLeft) }}
-                                                            hari</span>
-                                                    @else
-                                                        <span
-                                                            class="badge {{ $daysLeft <= 7 ? 'badge-warning' : 'badge-light' }}">{{ $daysLeft }}
-                                                            hari lagi</span>
-                                                    @endif
+                                                    12 Bulan
                                                 </td>
-                                                <td class="text-right">
-                                                    {{ number_format((float) $lot->qty_weight, 2, ',', '.') }}</td>
+                                                <td>{{ number_format($item->qty_weight, 2, ',', '.') }}</td>
+                                                <td>{{ $item->po_number }}</td>
+                                                <td>{{ $item->vendor_lot }}</td>
+                                                <td>{{ $item->production_date ? \Carbon\Carbon::parse($item->production_date)->format('M-Y') : '-' }}
+                                                </td>
+                                                <td>{{ $item->exp_date ? \Carbon\Carbon::parse($item->exp_date)->format('M-Y') : '-' }}
+                                                </td>
+                                                <td> <span class="badge badge-{{ $item->exp_info['class'] }}"
+                                                        style="font-size: 12px;">
+                                                        {{ $item->exp_info['text'] }}
+                                                    </span></td>
+                                                <td>{{ $item->qty_package ?? '-' }}</td>
+                                                <td>{{ $item->received_date ? \Carbon\Carbon::parse($item->received_date)->format('d-M-Y') : '-' }}
+                                                </td>
                                             </tr>
                                         @empty
                                             <tr>
-                                                <td colspan="6" class="text-center text-muted py-3">Tidak ada stok yang
-                                                    mendekati expired.</td>
+                                                <td colspan="12" class="text-center text-muted">Tidak ada data.</td>
                                             </tr>
                                         @endforelse
                                     </tbody>
                                 </table>
                             </div>
+                            <div class="tab-pane fade" id="pills-SF" role="tabpanel" aria-labelledby="pills-SF-tab">
+                                <div class="row align-items-center mb-2">
+                                    <div class="col">
+                                        <h2 class="h5 page-title">Laporan SF (BULAN)</h2>
+                                    </div>
+                                </div>
+                                <table class="table" id="dataTableItem" style="width:100%">
+                                    <thead>
+                                        <tr>
+                                            <th>No</th>
+                                            <th>Nama Item</th>
+                                            <th>Expired(Bulan)</th>
+                                            <th>Berat(KG)</th>
+                                            <th>NO PO</th>
+                                            <th>Vendor Lot</th>
+                                            <th>Tanggal Produksi</th>
+                                            <th>Expired Date</th>
+                                            <th>Month Overdue</th>
+                                            <th>Jumlah</th>
+                                            <th>Tanggal Penerimaan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($itemSF as $item)
+                                            <tr>
+                                                <td>{{ $loop->iteration }}</td>
+                                                <td>{{ $item->item->item_desc ?? '-' }}</td>
+                                                <td>
+                                                    12 Bulan
+                                                </td>
+                                                <td>{{ number_format($item->qty_weight, 2, ',', '.') }}</td>
+                                                <td>{{ $item->po_number }}</td>
+                                                <td>{{ $item->vendor_lot }}</td>
+                                                <td>{{ $item->production_date ? \Carbon\Carbon::parse($item->production_date)->format('M-Y') : '-' }}
+                                                </td>
+                                                <td>{{ $item->exp_date ? \Carbon\Carbon::parse($item->exp_date)->format('M-Y') : '-' }}
+                                                </td>
+                                                <td> <span class="badge badge-{{ $item->exp_info['class'] }}"
+                                                        style="font-size: 12px;">
+                                                        {{ $item->exp_info['text'] }}
+                                                    </span></td>
+                                                <td>{{ $item->qty_package ?? '-' }}</td>
+                                                <td>{{ $item->received_date ? \Carbon\Carbon::parse($item->received_date)->format('d-M-Y') : '-' }}
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="12" class="text-center text-muted">Tidak ada data.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="tab-pane fade" id="pills-HSF" role="tabpanel" aria-labelledby="pills-HSF-tab">
+                                <div class="row align-items-center mb-2">
+                                    <div class="col">
+                                        <h2 class="h5 page-title">Laporan HSF (BULAN)</h2>
+                                    </div>
+                                </div>
+                                <table class="table" id="dataTableItem" style="width:100%">
+                                    <thead>
+                                        <tr>
+                                            <th>No</th>
+                                            <th>Nama Item</th>
+                                            <th>Expired(Bulan)</th>
+                                            <th>Berat(KG)</th>
+                                            <th>NO PO</th>
+                                            <th>Vendor Lot</th>
+                                            <th>Tanggal Produksi</th>
+                                            <th>Expired Date</th>
+                                            <th>Month Overdue</th>
+                                            <th>Jumlah</th>
+                                            <th>Tanggal Penerimaan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($itemHSF as $item)
+                                            <tr>
+                                                <td>{{ $loop->iteration }}</td>
+                                                <td>{{ $item->item->item_desc ?? '-' }}</td>
+                                                <td>
+                                                    12 Bulan
+                                                </td>
+                                                <td>{{ number_format($item->qty_weight, 2, ',', '.') }}</td>
+                                                <td>{{ $item->po_number }}</td>
+                                                <td>{{ $item->vendor_lot }}</td>
+                                                <td>{{ $item->production_date ? \Carbon\Carbon::parse($item->production_date)->format('M-Y') : '-' }}
+                                                </td>
+                                                <td>{{ $item->exp_date ? \Carbon\Carbon::parse($item->exp_date)->format('M-Y') : '-' }}
+                                                </td>
+                                                <td> <span class="badge badge-{{ $item->exp_info['class'] }}"
+                                                        style="font-size: 12px;">
+                                                        {{ $item->exp_info['text'] }}
+                                                    </span></td>
+                                                <td>{{ $item->qty_package ?? '-' }}</td>
+                                                <td>{{ $item->received_date ? \Carbon\Carbon::parse($item->received_date)->format('d-M-Y') : '-' }}
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="12" class="text-center text-muted">Tidak ada data.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="tab-pane fade" id="pills-Rekap" role="tabpanel" aria-labelledby="pills-Rekap-tab">
+                                INI AKAN JADI DATA REKAP </div>
                         </div>
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 @endsection

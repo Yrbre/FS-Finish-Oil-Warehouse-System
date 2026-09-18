@@ -6,9 +6,6 @@
     <style>
         @page {
             size: letter portrait;
-            /* Printer tidak bisa mencetak sampai tepi fisik kertas
-               (umumnya 4-6mm). Tanpa margin, border kotak teratas
-               dan terbawah terpotong. */
             margin: 0.5cm;
         }
 
@@ -20,9 +17,6 @@
             padding: 0;
         }
 
-        /* Blok ATAS setinggi setengah kertas dikurangi margin:
-           396pt (tengah letter) - 14,17pt (margin) = 381,83pt.
-           Dengan begitu garis potong jatuh tepat 14cm dari tepi. */
         .half-top {
             height: 382pt;
             width: 100%;
@@ -30,9 +24,6 @@
             page-break-inside: avoid;
         }
 
-        /* Blok BAWAH cukup setinggi isinya. Kalau dibuat 382pt juga,
-           totalnya 764pt — melewati area cetak 763,65pt dan blok
-           kedua terlempar ke halaman berikutnya. */
         .half-bottom {
             height: 270pt;
             width: 100%;
@@ -40,8 +31,6 @@
             page-break-inside: avoid;
         }
 
-        /* Garis potong dibuat dengan div terpisah, bukan border pada
-           .half, supaya tidak menambah tinggi blok. */
         .cut-line {
             border-top: 1px dashed #bbb;
             height: 0;
@@ -54,7 +43,6 @@
         table.grid-wrapper {
             width: 100%;
             border-collapse: collapse;
-            /* Pengganti padding .half yang dibuang */
             margin: 0.25cm;
         }
 
@@ -66,8 +54,6 @@
 
         .ttb-box {
             width: 9.5cm;
-            /* Dari 12,4cm — sisa ruang di bawah tanda tangan
-               dipangkas supaya tidak ada area kosong yang lebar. */
             height: 9cm;
             box-sizing: border-box;
             border: 1px solid #000;
@@ -181,7 +167,6 @@
 <body>
 
     @php
-        // 2 TTB per blok setengah lembar, 2 blok per lembar = 4 TTB/halaman
         $halves = $transferRequests->chunk(2);
         $pages = $halves->chunk(2);
     @endphp
@@ -198,10 +183,6 @@
                             @php
                                 $rog = $transferRequest->receiptOfGoods;
                                 $totalRows = 12;
-
-                                // Ratakan: tiap item bisa punya beberapa lot,
-                                // dan tiap lot jadi satu baris di dokumen.
-                                // Item yang ditolak/dibatalkan tidak ikut dicetak.
                                 $rows = collect();
 
                                 foreach ($transferRequest->items as $trItem) {
@@ -275,8 +256,6 @@
                                                     </tr>
                                                 @endif
                                             @endforeach
-
-                                            {{-- Peringatan kalau ada baris yang tidak muat --}}
                                             @if ($rows->count() > $totalRows)
                                                 <tr>
                                                     <td colspan="6" class="text-left"
